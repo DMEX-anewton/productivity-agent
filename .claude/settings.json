@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "deny": [
+      "Write(./data/**)",
+      "Edit(./data/**)",
+      "Write(./audit/**)",
+      "Edit(./audit/**)",
+      "Read(~/.dme-secrets/**)",
+      "Read(**/*.env)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|NotebookEdit|Bash",
+        "hooks": [
+          { "type": "command", "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard.py\"" }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/audit_log.py\"" }
+        ]
+      }
+    ]
+  }
+}

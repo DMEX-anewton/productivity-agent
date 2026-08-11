@@ -1,0 +1,12 @@
+# ── Patient/operational data & local artifacts: NEVER shared ────────────────
+data/
+audit/
+outputs/
+# ── Credentials: never committed, anywhere ──────────────────────────────────
+*.env
+.env*
+.dme-secrets/
+# ── Python/Jupyter noise ─────────────────────────────────────────────────────
+__pycache__/
+.ipynb_checkpoints/
+*.pyc
