@@ -6,12 +6,15 @@ Open analysis work, highest value first. Move items to `insights-log.md` when an
 
 ## Follow-ups from the July-2026 drop diagnosis (2026-08-14)
 
-- [ ] **Re-run the dashboard end to end on v1.2.0 and reconcile it against v1.1.0.**
-  The v1.2.0 cells were tested individually against live data (virtual-warehouse
-  resolution, apportionment, the renderer) but the full 85-page PDF / 26-sheet
-  workbook has not been produced yet. Set `INCLUDE_VIRTUAL_WH_IN_PRODUCTIVITY=False`
-  and `APPORTION_TECH_DAYS=False` for a v1.1.0-parity run if a line-by-line
-  reconciliation is wanted.
+- [x] **v1.3.0 executed end to end against live data** — all 37 code cells run clean,
+  44 Excel sheets and the PDF produced, every internal reconciliation guard passing
+  (apportioned days = distinct tech-days exactly; OT apportionment gap fully explained
+  by 212 technician-months on payroll with no tickets). The PDF render was exercised on
+  7 representative pages rather than all ~85, so the only untested part is the loop
+  count. Set `INCLUDE_VIRTUAL_WH_IN_PRODUCTIVITY=False` and `APPORTION_TECH_DAYS=False`
+  for a v1.1.0-parity run if a line-by-line reconciliation is wanted.
+- [ ] **Do a full ~85-page run on the analyst's machine** and skim the warehouse pages —
+  small sites may have sparse overtime or lost-equipment panels worth a layout tweak.
 - [ ] **Re-sync `tech_workload` (v1.35.0) with the same two fixes.** It carries the
   same `Tech_Warehouse NOT LIKE 'Z%'` exclusion and the same whole-day denominator, so
   its July figures are wrong in the same two ways. The dashboard's cells are marked
@@ -33,17 +36,35 @@ Open analysis work, highest value first. Move items to `insights-log.md` when an
   hard `assert` when the excluded share or virtual share moves more than N points
   month over month.
 
+## Done 2026-08-14 (v1.3.0)
+
+- [x] **Lost equipment source found and wired.** `ATI.Lost` is dead (NULL on all 583,530
+  rows); the live register is `SERP_LOST_EQUIPMENT`. Panels populate. Remaining: the feed
+  is 85 days stale (question 6 for the CFO) and four month-end spikes need classifying
+  (question 7).
+- [x] **Stock outs: true incidence built.** `EnRoute` rows *are* retained after
+  fulfilment, so creation-month counts are genuine incidence — the old "fulfilled
+  stock-outs disappear" caveat was wrong. Outcome is now three-way (fulfilled 64.7% /
+  canceled 28.2% / open 7.1%) and time-to-fulfil comes from the ticket join. Warehouse and
+  metro pages carry numbers for the first time (76% order-level attribution).
+- [x] **Overtime section built** on de-duplicated PLC daily hours with PTO/Holiday
+  excluded from the threshold. The feed's own OT columns are unusable and are now
+  documented as such with a per-run diagnostic.
+
 ## Carried forward
 
-- [ ] **Lost equipment: no data at all.** `SERP_ACTIVE_TAGGED_INV` has zero
-  lost-flagged rows company-wide (probe confirmed, not a date-filter miss). Every lost
-  panel is blank. Blocked on question 4 in `questions-for-cfo.md`.
-- [ ] **Stock outs: get true incidence, not just open backlog.** The current query
-  filters `Status='EnRoute'`, so a stock-out created in May and fulfilled in June
-  disappears entirely and the "trend" is really a backlog-aging view. The table does
-  retain other statuses (Canceled 2,297 orders, Reconciled 689, Completed 69), so a
-  genuine incidence history may be reconstructable — worth confirming with the SERP
-  team which statuses represent fulfilment.
+- [ ] **Confirm the four unlisted lost-equipment spike dates** (2025-01-31, 2025-04-30,
+  2025-05-31, 2026-05-15) — question 7 for the CFO. They are currently included in every
+  metric; three of four fall on a month end, which smells like posting dates.
+- [ ] **Investigate the 1,518 genuinely open stock-outs** (median age 115 days) and the
+  6,035 canceled ones. `StockOut_Backlog` and `StockOut_Canceled` list both by site,
+  product and age. Pair with question 5 for the CFO.
+- [ ] **Chase the 25% of payroll records that don't tie to a technician** (9.9% of OT
+  hours unattributable to a site). The name matcher already exports unmatched candidates
+  in `tech_workload`; consider running the same HR-review export for payroll names.
+- [ ] **`open_orders` by creation month is lumpy** — 0 for most of 2025 but 372 in
+  2025-12 and 148 in 2026-03. Worth a look at whether those months genuinely never got
+  tickets or whether the order numbers changed form.
 - [ ] **Exchange dedup leaves 2,752 groups with more than one kept row** (Cell 10
   prints this as a WARNING every run and it is currently ignored). Either the exchange
   definition needs widening or those groups are legitimately multi-visit; decide and

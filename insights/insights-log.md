@@ -4,6 +4,101 @@ Newest first. Each entry: what we found, how we know, what it changes, what it d
 
 ---
 
+## 2026-08-14 — v1.3.0: stock outs, lost equipment and overtime populated. Every one of the three had a source-level defect first.
+
+Built in `analysis/ops_dashboard_2026-08-14_v1_3_0.ipynb`, alongside a full code audit
+(`code-audit-ops-dashboard-2026-08-14.md`). The pattern across all three sections: the
+analytical logic was never the problem — the *source* was, and in each case the failure
+was silent.
+
+### Stock outs — 28% of stock-outs end with the order abandoned, not supplied
+
+The dashboard read `Status='EnRoute'` as an open backlog and trended it as aging. It is
+not a backlog: rows are retained after the stock-out is dealt with (19,891 of 21,438
+carry a completion date), and every other status value is frozen at a single 2026-01-20
+load, so "oldest open 1,021 days" was a stale row.
+
+Reframed to incidence by creation month, and the outcome split is the finding:
+
+| outcome | orders | share |
+|---|---|---|
+| **fulfilled** — completion on a live (Reconciled/Completed) ticket | 13,856 | **64.7%** |
+| **canceled / abandoned** — completion only on a `Canceled` ticket | 6,035 | **28.2%** |
+| **genuinely open** — no completion evidence at all | 1,518 | **7.1%** |
+
+Nearly three in ten stock-outs end with the order dropped rather than filled. That is an
+operational question, not a data one — raised in `questions-for-cfo.md`.
+
+Time-to-fulfil for the ones that do land: **P25 3 / median 6 / P75 9 / P90 17 days**. The
+genuine backlog is 1,518 orders with a median age of 115 days.
+
+**A correction worth recording.** My first pass reported 93% fulfilment. That counted
+canceled tickets as deliveries — a canceled ticket carries a `Completed_Date` too. The
+93% figure was wrong and is corrected wherever it was written. Fulfilment must also be
+tested against the *unfiltered* ticket feed: 1,165 stock-out orders sit under
+`Priority 4 - System Update/Correction (D)`, which the analysis whitelist excludes on
+purpose, and measuring against the filtered set alone left them looking open forever.
+
+Warehouse and metro pages now carry stock-out numbers for the first time. v1.1.0 asserted
+no physical warehouse existed on these rows; 5,726 EnRoute rows carry one of 65 real
+warehouses, and an order-level join resolves **76.0%** of orders to a site.
+
+### Lost equipment — the panel had been structurally empty, and it was a one-column failure
+
+`SERP_ACTIVE_TAGGED_INV.Lost` is NULL on **all 583,530 rows**, so
+`WHERE ATI.Lost IS NOT NULL` could never return anything. v1.0.1's probe found the zero
+and blamed the feed; the register had in fact moved. Of five candidate sources only
+**`SERP_LOST_EQUIPMENT`** is live (91,023 rows, warehouse names matching the master 71 of
+72, and it adds Lost Reason, Resolution and Resolved Date).
+
+Two traps made this a silent failure rather than a loud one: `[Lost Date]` is not a date
+but an HTML fragment (`01/02/2025<br/>(147)`) that `TRY_CONVERT` fails on for **100%** of
+rows, and `[Unit Cost]` is a currency string. A naive port would have produced the same
+empty panel. The parse-failure rate is now asserted, not printed.
+
+Company monthly loss runs **~2,500–4,400 assets and $200k–$370k** through the window.
+Recovery is 13–25% on mature cohorts, with resolution taking **P25 21 / median 42 / P75
+91 days**.
+
+Limits, both material: the feed **ends 2026-05-20** (85 days behind the rest of the
+dashboard — every page carries a banner), and the **2025-08-01 bulk event is excluded**
+from all metrics and trends per the analyst's instruction — 30,902 rows, $3.06M, 99.9% of
+it parked in `Z Equipment Collections` / `Z CS` rather than at physical sites, which is
+what marks it as a reconciliation dump rather than operational loss. It is reported in
+its own sheet. Four further month-end spikes are surfaced but **not** excluded, pending
+confirmation.
+
+### Overtime — the feed's own overtime columns are unusable, and the feed double-loads
+
+Overtime runs **~16–19% of worked hours** company-wide and is stable month to month
+(Patient Care Technicians: 3,178 OT hours in Jan-2025 rising to 8,384 in Jul-2026 as
+headcount grew 127 → 308). All-departments OT is ~15–16%.
+
+Getting there required disarming four landmines:
+
+- **The payroll feed re-loads overlapping windows, so rows accumulate.** 12.4% of pulled
+  rows are duplicates; one employee-day appeared 30 times. Un-deduplicated, Jun-2026
+  reads **66% overtime**. A second de-duplication rule (newest load only) agrees to 0.1%,
+  which is what gives confidence in the fix.
+- **`Reg_Hrs` / `OT1_Hrs` / `OT2_Hrs` / `Paid_Hrs` / `Est_*` cannot be summed** — they are
+  pay-period values repeated on every daily row (16–18× the trusted daily `Hours`),
+  `OT1_Hrs` is 0 for every month from 2026-02 on, and `OT2_Hrs` is 0 throughout. OT is
+  inferred FLSA-style instead, and a diagnostic re-proves this on live data every run.
+- **`Pay_Type` separates PTO and Holiday**, which retires the long-standing caveat that
+  inferred OT is overstated when paid leave is included. Worth **18%** in Jul-2026
+  (10,264 hours including leave vs 8,384 excluding). Both figures are emitted.
+- 709 rows carry NULL department/employee and 2,600–3,100 hours each (1.05M hours, more
+  than every real row combined), and the feed holds future-dated rows. Both guarded.
+
+Payroll has no usable warehouse key — only **2 of 139** `Location_Name` values match the
+master — so hours reach a site through the technician name match (75.1% of payroll people
+tie to an attributed technician) and are then apportioned by ticket share, the same rule
+v1.2.0 introduced for active days. **9.9% of OT hours cannot be attributed to any site**
+and remain in the company total only, so site rows sum to less than the company row by
+design; the reconciliation is printed and self-explaining every run.
+
+---
+
 ## 2026-08-14 — The July-2026 drop in tickets per technician is a measurement artifact, not an operations slowdown
 
 **Question asked:** why does tickets-per-technician fall in July across nearly every
@@ -99,5 +194,8 @@ tech-days (distribution, not mean — the tails are the story):
   System Update/Correction rows roughly doubled in July (329 → 783), which is
   consistent with a migration and is now tracked by diagnostic D1.
 - Lost-equipment metrics remain empty for an unrelated reason: `SERP_ACTIVE_TAGGED_INV`
-  has **zero** lost-flagged rows company-wide, confirmed by probe. That is an upstream
-  feed issue, not a filter bug.
+  has **zero** lost-flagged rows company-wide, confirmed by probe.
+  **Superseded 2026-08-14 (v1.3.0):** it was not an upstream feed outage as concluded
+  here — the `Lost` column is dead (NULL on all 583,530 rows) and the register had moved
+  to `SERP_LOST_EQUIPMENT`, which is live. Lost equipment now reports. See the v1.3.0
+  entry above.

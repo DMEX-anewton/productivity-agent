@@ -54,15 +54,70 @@ operations considers a technician to "belong" to a home site regardless of where
 run, the site pages should be built that way instead. This is a reporting-definition
 decision, not a data question — we need the owner's preference.
 
-### 4. `SERP_ACTIVE_TAGGED_INV` has zero lost-flagged rows company-wide
+### 4. ~~`SERP_ACTIVE_TAGGED_INV` has zero lost-flagged rows~~ — ANSWERED 2026-08-14
 
-Unrelated to the July issue, but it means every lost-equipment panel on the dashboard
-is blank and has been for at least the 2025-01 → 2026-08 window. The probe confirms
-zero lost-flagged rows exist at all, so this is not a date-filter bug. Were the Lost
-flags cleared or purged, or has the process for marking equipment lost changed? Until
-answered, we have no lost-equipment visibility at any level.
+Resolved by the v1.3.0 source audit: the column is dead (NULL on all 583,530 rows) but
+the register had simply moved to `SERP_LOST_EQUIPMENT`, which is live and richer. Lost
+equipment now reports. Two follow-ups below (questions 6 and 7) came out of it.
 
-### 5. Can we get notified when a reason code or status value changes upstream?
+### 5. Nearly 3 in 10 stock-outs end with the order abandoned, not supplied *(new, highest value)*
+
+Of 21,409 stock-out events in the window, **6,035 (28.2%)** have no completion on a live
+ticket — their only completion evidence sits on a **canceled** ticket. Another 1,518
+(7.1%) have no completion evidence at all and are genuinely open, at a median age of 115
+days. Only **64.7%** were filled, typically in 6 days.
+
+- Is a ~28% abandonment rate expected? If the patient's need was met another way (a
+  substitute product, another branch, a purchase), the order being canceled is fine and
+  we should measure "need met" rather than "this order filled".
+- If it is not expected, this is the largest single operational finding in the dashboard,
+  and the `StockOut_Canceled` sheet lists every one by site, product and age.
+- Either way: **who owns the stock-out queue?** The 1,518 genuinely open orders have a
+  median age of 115 days, which suggests nobody is working the list.
+
+### 6. Who owns the lost-equipment feed, and can it be brought current? *(new)*
+
+`SERP_LOST_EQUIPMENT` is live and now drives the dashboard, but it **stops at
+2026-05-20** — 85 days behind every other metric. Every lost-equipment panel carries a
+staleness banner as a result, and the last month must not be read as an improvement. Who
+refreshes this, and on what cadence?
+
+### 7. Are these four month-end lost-equipment spikes real losses or batch postings? *(new)*
+
+The dashboard now surveils for bulk events. Beyond the confirmed 2025-08-01 discard
+(excluded), four dates exceed 8× the daily median and are **still counted** in every
+metric and trend:
+
+| date | rows | pattern |
+|---|---|---|
+| 2025-01-31 | 1,588 | month end |
+| 2025-04-30 | 1,504 | month end |
+| 2025-05-31 | 920 | month end |
+| 2026-05-15 | 1,854 | mid-month |
+
+Three of the four are the last day of a month, which looks like a posting-date artifact
+rather than 1,500 assets going missing in a day. If they are batch postings, the losses
+are real but the *dates* are not, which flattens any within-month trend. Confirm and we
+will either re-date them or add them to the exclusion list.
+
+### 8. Payroll: confirm the de-duplication rule and how on-call is paid *(new)*
+
+Before any overtime **dollar** figure is circulated, two payroll confirmations:
+
+- `PLC_EMPLOYEE_HOURS` re-loads overlapping date windows rather than replacing them, so
+  **12.4%** of rows are duplicates (one employee-day appeared 30 times). We de-duplicate
+  on the full business tuple; an alternative rule (keep only the newest load) agrees to
+  0.1%, so we are confident — but payroll should confirm which is correct.
+- We count **On Call Hours as worked time** toward the 40-hour threshold and exclude PTO
+  and Holiday. If on-call is paid but not hours-worked for FLSA purposes, overtime is
+  slightly overstated and we will change it.
+
+Also worth knowing: **25% of Patient Care Technician payroll records don't tie to any
+technician on a ticket**, and 9.9% of overtime hours therefore cannot be attributed to a
+site. Are those techs at locations we aren't mapping, or people whose ticket activity is
+recorded under a different name?
+
+### 9. Can we get notified when a reason code or status value changes upstream?
 
 The dashboard filters tickets to a whitelist of 30 reason codes. If a code is renamed
 upstream, its tickets vanish from every report with no error — the same class of
