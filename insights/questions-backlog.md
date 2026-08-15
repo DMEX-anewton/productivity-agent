@@ -4,6 +4,94 @@ Open analysis work, highest value first. Move items to `insights-log.md` when an
 
 ---
 
+## v1.6.1 follow-ups — trailing census pooling (2026-08-15)
+
+- [ ] **Re-check Cell 13.5 once more against the live run.** Four pooling defects were fixed in
+  v1.6.1, all in the `_t4w` columns; weekly figures were never affected. The new bracket guard
+  RAISES if any trailing census ratio falls outside the range of the weekly values behind it, so
+  a live run either completes clean or names the metric — there is no longer a silent mode. If it
+  raises, the message says which metric and grain.
+- [x] **The Cell 13.5 crash is fixed and reproduced.** `ValueError: Boolean array expected for
+  the condition, not int64` came from `add_trailing` promoting a bool column to object when it
+  reindexed the caller's whole frame onto the week spine. It needs an entity-week with NEITHER
+  tickets NOR census, which is why 15 hostile variants missed it; the probe now carries that
+  combination and reproduces the error against v1.6.0. Verified fixed under both Python 3.12 /
+  pandas 2.3.2 and Python 3.14 / pandas 2.3.3 (the analyst's environment).
+- [ ] **Audit the other weekly cells for the same dtype trap.** `add_trailing` no longer alters
+  caller columns, so the class is closed at the root — but any other place that left-merges a
+  frame against the spine can reintroduce it. `attach_spine` is the one to check first.
+- [ ] **Test against Python 3.14 / pandas 2.3.3, not just 3.12.** That is the analyst's actual
+  environment and it was not what the harness ran. The suite now runs under both; keep it that
+  way, because a dtype-promotion defect is exactly the kind that differs across versions.
+- [ ] **Extend the bracket invariant to the other metric families.** It currently guards the
+  census panel only, because that is where the defects were. Overtime, lost equipment,
+  redeliveries and stock outs all publish pooled trailing rates built the same way and have never
+  been checked. This is the highest-value remaining item in the notebook — it is ~15 lines reusing
+  `_bracket_violations`.
+- [ ] **Decide whether suppressed weeks should be excluded from the trailing average everywhere,
+  not just in census.** v1.6.1 made that change for the census panel on the grounds that pooling a
+  week too thin to publish reintroduces the distortion the floor prevents. The same argument
+  applies to the per-panel `min_denom` suppression in Cell 18, which currently withholds a plotted
+  point but leaves the trailing line pooling it.
+
+## v1.6.0 follow-ups — Cell 13.5 fixes + document deliverables (2026-08-15)
+- [ ] **Check `techs_equiv` against reality on the first live run.** The apportioned headcount
+  only differs from the raw distinct count to the extent technicians work more than one site.
+  The synthetic run was deliberately extreme (3.8× double-count); the real figure is probably
+  small, and the printed tie-out will say. If it is small, the VP-grain census restatement from
+  this release is minor; if it is large, it is another moved number to flag.
+- [ ] **Tune `RECS_MIN_SEVERITY_PCT` and `RECS_EFF_GAP_PCT` after the first real run.** Both were
+  set from reasoning, not from looking at real VP spread. If VPs come out tightly clustered,
+  5% will produce very short recommendation lists; if they are widely spread, it will produce
+  five weak ones. The count per VP is printed.
+- [ ] **Have someone who is not the analyst read one VP recommendations document cold.** The
+  naming rules, the coaching caveat and the censoring notes are all in there, but whether a VP
+  reads them *before* the technician table is a question about the document, not the data.
+- [ ] **Decide whether recommendation documents should go to VPs directly or via the CFO.** They
+  name individuals. That is a distribution decision, not an analysis one, and it should be made
+  before the pack is circulated.
+- [ ] **Add the remaining undocumented columns to `METRIC_REGISTRY` if anyone quotes them.** The
+  dictionary validation prints any published column with no definition; the current list is
+  intermediate working values, but that is a judgment that should be revisited when someone asks
+  about one.
+
+## v1.5.0 follow-ups — census restatement + weekly grain (2026-08-15)
+
+- [ ] **Run the notebook (now v1.6.0) end to end against live data.** This is the blocking item: the audit's
+  reconciliation table is derived from figures already in `insights-log.md`, but the four
+  source-level census findings and the VP/metro equipment-rate bug are established from the code
+  and their **magnitudes are unquantified**. The run prints all of them. Specifically capture:
+  the `(F)`/`(IPU)`/`Contract Test` exclusion as a % of patient-days; the `Census_Coverage` sheet
+  (warehouse-months where the old summed-averages shape distorted ADC); virtual-warehouse census
+  by month; the VP-vs-company patient-day check in Cell 14; and the before/after on
+  `lost_cost_per_1k_pt_days` at VP and metro grain.
+  *Pre-release verification done instead:* 22 synthetic assertions on the spine/trailing helper,
+  plus an end-to-end synthetic execution of all ten rewritten cells, the renderer and the Excel
+  export. That found two real bugs; it is not a substitute for a live run.
+- [ ] **Re-issue the affected pages of the last pack, or footnote them.** Two published numbers
+  move materially: census per technician (down ~27–29% against the v1.4.0 basis) and VP/metro
+  `lost_cost_per_1k_pt_days` (up several-fold). Decide with the CFO whether to re-issue or annotate
+  before the next board pack — the census figure has already been quoted at ≈ 120.
+- [ ] **Answer question 1 in `questions-for-cfo.md` before any per-technician target is set.**
+  The three candidate denominators differ by ~40% end to end.
+- [ ] **Skim ~85 warehouse pages on the weekly grain.** Small sites now have ~4× more points and
+  much sparser weekly counts; the suppression floors (`CENSUS_MIN_ACTIVE_TECHS`,
+  `CENSUS_MIN_TECHS`, and the per-panel `min_denom` values in Cell 18) were set from reasoning, not
+  from looking at real small-site output. Expect to tune them.
+- [ ] **Re-sync `tech_workload` (v1.35.0) — it now lags by four releases.** It still carries the
+  v1.1.0 `Z%` exclusion and whole-day denominator, and it has *none* of the v1.5.0 census or
+  equipment-rate fixes. Cells marked LIFTED VERBATIM have diverged further.
+- [ ] **Decide whether virtual-warehouse census can be attributed to a site at all.** It is kept
+  and tagged now, but a census row carries no technician, so Cell 8.1b's ticket re-attribution does
+  not apply. If `Z CS` census turns out to be material, this needs a key the feed does not have —
+  ties to question 1 in `questions-for-cfo.md`.
+- [ ] **Reconsider whether the redelivery and stock-out panels should show a censoring shade.**
+  Both are keyed to an originating/creation week, so their last few weeks are structurally
+  incomplete. The panels say so in a note; a greyed region over the incomplete tail would be harder
+  to misread, but needs a defensible cut-off (median time-to-event) rather than a guess.
+
+---
+
 ## Follow-ups from the July-2026 drop diagnosis (2026-08-14)
 
 - [x] **v1.3.0 executed end to end against live data** — all 37 code cells run clean,

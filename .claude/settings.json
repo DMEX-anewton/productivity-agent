@@ -1,18 +1,39 @@
 {
   "permissions": {
+    "allow": [
+      "Read(./**)",
+      "Edit(./**)",
+      "Write(./**)",
+      "Bash(python *)",
+      "Bash(python3 *)",
+      "Bash(py *)",
+      "Bash(jupyter *)",
+      "Bash(sqlcmd *)",
+      "PowerShell(python *)",
+      "PowerShell(py *)",
+      "PowerShell(jupyter *)",
+      "PowerShell(sqlcmd *)"
+    ],
+    "ask": [
+      "Write(./.claude/**)",
+      "Edit(./.claude/**)",
+      "Write(./CLAUDE.md)",
+      "Edit(./CLAUDE.md)"
+    ],
     "deny": [
       "Write(./data/**)",
       "Edit(./data/**)",
       "Write(./audit/**)",
       "Edit(./audit/**)",
       "Read(~/.dme-secrets/**)",
+      "Read(**/.dme-secrets/**)",
       "Read(**/*.env)"
     ]
   },
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Write|Edit|NotebookEdit|Bash",
+        "matcher": "Write|Edit|NotebookEdit|Bash|PowerShell",
         "hooks": [
           { "type": "command", "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard.py\"" }
         ]

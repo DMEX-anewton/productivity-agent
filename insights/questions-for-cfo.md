@@ -4,6 +4,54 @@ Questions analysis cannot answer from the data alone. Newest first.
 
 ---
 
+## 2026-08-15 — raised by the census-per-technician audit
+
+Context: the v1.4.0 pack reported ≈ 120 patients on service per technician; ADC ÷ headcount is
+≈ 85–93. Both figures are arithmetically correct — they use different denominators, and the ~40%
+gap between them is average weekday attendance. The metric is restated in v1.5.0
+(`insights/metric-audit-adc-per-tech-2026-08-15.md`). These four questions are what analysis
+cannot settle on its own.
+
+### 1. Which denominator should a per-technician caseload *target* use? *(blocks: any staffing target)*
+
+Three defensible answers, and they are ~20% apart from each other and ~40% from what v1.4.0
+published:
+
+| denominator | Jul-2026 value | reads as |
+|---|---|---|
+| ~300 payroll technicians | **77.9** | patients per technician we pay for |
+| 251 distinct technicians on tickets | **93.1** | patients per technician who did field work |
+| 178.8 average technicians on the road per weekday | **130.6** | patients per technician actually deployed (v1.4.0) |
+
+v1.5.0 publishes the middle one as the headline and carries the third for reconciliation. If
+leadership intends the first — a payroll-based ratio — we need question 4 answered before it can
+be produced reliably. **Please confirm which one any target or benchmark is stated against.**
+
+### 2. Should facility `(F)` and inpatient-unit `(IPU)` census count toward technician caseload?
+
+The APC snapshot excludes them; the ADC series every metric consumed did not. Both readings are
+defensible — a facility patient may generate very different field work from a home patient — but
+having both in use inside one notebook is not. v1.5.0 applies the APC exclusion everywhere and
+prints what it is worth. **Confirm the exclusion is the right call**, or tell us the two
+populations should be reported separately rather than netted.
+
+### 3. Are the NULL-`customer` census rows real patients?
+
+`NOT LIKE` is NULL-unsafe, so a census row with no customer value falls out of the filtered figure
+silently. This behaviour is inherited from the v1.4.0 APC snapshot definition, not introduced by
+the fix, and its volume is now printed on every run. If those are real patients on service the
+filter needs an explicit `IS NULL` branch.
+
+### 4. Why do ~300 technicians on payroll become ~250 attributed to tickets?
+
+Part is known — 75.1% of payroll people tie to an attributed technician via the name match, and
+some payroll rows are genuinely non-field roles. The remainder is not accounted for. Until it is,
+**no per-technician metric can be quoted against a payroll headcount without naming its
+denominator**, which is precisely the ambiguity that produced the 85-versus-120 question. This is
+an HR/payroll reconciliation, not an analysis task.
+
+---
+
 ## 2026-08-14 — raised while diagnosing the "July productivity drop"
 
 Context: the July drop turned out to be a measurement artifact, now corrected
