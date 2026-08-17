@@ -4,6 +4,231 @@ Newest first. Each entry: what we found, how we know, what it changes, what it d
 
 ---
 
+## 2026-08-17 — v1.7.1: three census definitions confirmed by leadership, and one that was right by accident
+
+`analysis/ops_dashboard_2026-08-14_v1_7_1.ipynb`. Answers to questions 1–3 of
+`questions-for-cfo.md`, given by the analyst the same day v1.7.0 was built.
+
+**No published figure moves.** All three confirm numbers the pack already produces. What
+changes is their *status*: from inherited, assumed, or — in the third case — accidental, to
+declared with a date and, where it matters, asserted on every run.
+
+### 1. The caseload denominator is distinct technicians active in the period
+
+> *"ADC per technician should be calculated as total active patients on service in the period
+> divided by the total active count of technicians active in the same period."*
+
+That is average daily census ÷ distinct technicians active in the period — the middle of the
+three candidates that were ~40% apart end to end, and the one the pack already publishes.
+Not payroll headcount (~300), not average technicians on the road per weekday (~180, retired in
+v1.7.0).
+
+**The interesting part is what this did to an implementation detail.** At company grain
+`techs_equiv` equals `techs_distinct` by construction — every technician's days are all inside
+the company, so each contributes exactly 1.0. That was an incidental property of how the
+apportioned headcount is built. It is now *the definition of the published metric*. A
+definition resting on an incidental property deserves a guard, so **Reconciliation 6 asserts
+the equality at company grain and raises** if a future change to the apportionment breaks it —
+because if it silently broke, the company headline would stop being the metric leadership
+signed off on, with nothing in the output to show it.
+
+**Deliberately not settled, and flagged rather than assumed:** at VP/metro/warehouse grain the
+pack divides by the *apportioned* headcount so site rows sum to the company row. The literal
+reading of the confirmed definition would use the raw distinct count at site grain, which
+double-counts anyone working two sites and makes the grains non-additive. Company figures are
+identical either way, both columns ship, and this is an analyst call rather than a leadership
+one — so it went to the backlog and to the "still open" list in the dictionary, not into the code.
+
+### 2. Facility (F) and inpatient-unit (IPU) census do not count
+
+Excluded since v1.5.0, so nothing moves. But the *justification* was "matching the company APC
+snapshot definition" — inherited from another report rather than chosen for this one. That is a
+weaker footing than it reads as, and it is now policy with a date.
+
+### 3. NULL-customer census does not count either — and this one was right by accident
+
+The substantive code change, and the one worth remembering. NULL-customer patient-days were
+already excluded from the filtered figure — but only because `customer NOT LIKE '(F)%'`
+evaluates to NULL for a NULL customer, `NULL AND NULL` is NULL, and `CASE WHEN NULL` takes the
+`ELSE` branch. **Nothing in the code said those rows should be excluded.** Three-valued logic
+was making a business decision silently, and any rewrite of the predicate into a form where
+that no longer held would have moved a published figure with no diff to point at.
+
+v1.7.1 emits `AND APC.customer IS NOT NULL` as a declared term, behind a new
+`CENSUS_EXCLUDE_NULL_CUSTOMER` flag. Verified against a real SQL engine (SELECT/WITH only —
+the guard hook correctly blocked a first attempt that used `CREATE TABLE`, which is exactly
+what rule 4 is for) that the old and new predicates select **identical rows** for an identical
+`pt_count`, including a near-miss customer name (`(Fx) Not A Facility`) that must *not* be
+excluded. The change is to why the exclusion holds, not to whether it does.
+
+**The generalisable lesson**, and it is the same shape as the v1.6.2 defect: *a correct number
+produced by a mechanism nobody chose is a latent defect, not a working feature.* It survives
+only as long as nobody touches the mechanism, and when it breaks it breaks silently. Worth
+looking for elsewhere — the audit's finding that `t4w_weeks_observed` did not measure what its
+comment claimed is the same family.
+
+### What this closes in the published outputs
+
+Questions 1 and 2 came off the open lists in the metric dictionary, the publishable PDF's
+appendix and the Excel README, replaced by a *"Definitions confirmed by leadership"* section
+stating the basis. A distributed pack that keeps calling a settled question open teaches its
+readers that it does not know its own definitions — the same drift the audit found in the
+dictionary's exchange-pair claim, in the opposite direction.
+
+Question 4 (why ~300 payroll technicians become ~250 attributed to tickets) stays open but is
+**downgraded from blocking to informational**: it was a prerequisite only for a payroll-based
+denominator, and that is not the confirmed one.
+
+### Verification
+
+`analysis/lib/verify_ops_dashboard_v1_7_0.py` re-run against v1.7.1: 51 assertions pass,
+including the new Reconciliation 6. Plus the SQL-engine equivalence check above. Still no live
+database run — the three confirmations do not need one, since none of them moves a number, but
+the four open pooling defects from the 2026-08-17 audit still do.
+
+---
+
+## 2026-08-17 — v1.7.0: the v1.4.0 census basis is retired, pages split labour from equipment, and a full audit found four unfixed pooling defects
+
+`analysis/ops_dashboard_2026-08-14_v1_7_0.ipynb`. Requested by the analyst: drop the retained
+v1.4.0 ADC-per-technician basis, split each output page in two, show the ADC and technician
+counts behind the ratio, and audit the workbook. Full audit:
+`insights/code-audit-ops-dashboard-2026-08-17.md`.
+
+### No published figure moves
+
+Worth stating first, because the last three releases all restated something. v1.7.0 removes
+columns, changes layout, and adds columns that are existing internal quantities under public
+names. Every weekly and trailing value for productivity, census per technician, attendance,
+overtime, lost equipment, redeliveries and stock outs is identical to v1.6.2.
+
+### Retiring the v1.4.0 basis was worth more than retaining it
+
+`census_per_active_tech_weekday` was kept from v1.5.0 so the ~40% restatement could be
+reconciled line by line against the v1.4.0 pack. Three arguments ended that:
+
+1. The reason expired — the restatement has been circulated for three releases.
+2. **A retired metric that is still published is still quoted.** Its own dictionary entry had
+   to say *"never put it beside a per-technician staffing target"*, and it was drawn on every
+   census panel at every grain directly beside the per-technician figure.
+3. **It was the expensive part of the last two releases.** Of the four pooling defects fixed in
+   v1.6.0 and the one in v1.6.2, *three were in that ratio or in the wedge column that existed
+   to explain it*, and it is what made Reconciliation 4 fire on live data.
+
+Nothing is lost: both inputs (`adc`, `avg_active_techs`) remain published at every grain, so
+the field-coverage figure is still computable. `attendance_rate_pct` — the informative half —
+is promoted from a shaded fill between two lines to a panel with its own axis and its own
+suppression floor. The generalisable lesson: **a reconciliation column needs an expiry date at
+the moment it is added**, or it accumulates correctness debt indefinitely against a use nobody
+is making.
+
+### Publishing the ratio's inputs was not a two-line change, and that is the finding
+
+The request — show ADC and the technician count, not just the quotient — is trivial for a
+weekly point: `adc` and `techs_equiv` are on the row and their quotient is the plotted value.
+For the **trailing** point it is a trap. `adc_t4w` is pooled over the weeks census was
+*observed*; `techs_equiv_t4w` is a spine mean with quiet weeks zero-filled. **Their quotient is
+not the published trailing ratio** — that is exactly the v1.6.2 defect — and those two columns
+sit on the same row looking like the obvious pair to print. Printing them would have invited
+every reader to divide two published numbers and get a third.
+
+So Cell 13.5 publishes the components the trailing ratio is *literally* built from
+(`ratio_adc_t4w`, `ratio_techs_equiv_t4w`, `ratio_weeks_observed_t4w`, pooled over the same
+mask-D weeks), and **new Reconciliation 5 raises** if their quotient is not the published
+figure, or if an input survives on a row whose ratio was suppressed. A printed input that does
+not reproduce the printed figure is worse than no input.
+
+Along the way: `t4w_weeks_observed` **does not measure what v1.6.2's comment claimed it did.**
+That comment says a trailing figure "can rest on fewer than ROLL_WEEKS weeks, so
+t4w_weeks_observed travels beside it and says how many". It counts the weeks the entity had
+*any row*, not the weeks the ratio was defined in, so it overstates wherever the census feed
+lagged or a week was suppressed. `add_trailing` gained `sum_cols` (additive, default-empty) so
+that `ratio_weeks_observed_t4w` is an exact count and the claim is finally true of a column
+that measures it.
+
+### The page split, and what it cost
+
+One 3×4 sheet of eleven panels plus a table became two 2×3 sheets of six. Page 1 is labour
+(productivity, census per technician, overtime hours, top/bottom technicians, weekday
+attendance, overtime % of worked hours); page 2 is equipment, redeliveries and stock outs, with
+each volume directly above the rate derived from it. A column is a metric family on both pages.
+
+A panel goes from ~5.5×4.4in to ~7.3×6.4in, which is what let the typography come off the
+5.5–9pt floor it had been pinned to. **That floor was hiding a defect that had been shipping
+since v1.5.0:** the italic caveats above each panel were single unwrapped lines and had been
+overflowing into the neighbouring panel — at 3×4 the notes were the same length and the panels
+narrower, so it was worse there. An unreadable caveat is an absent caveat, and several of these
+are the difference between a censored series and a collapsing one. Font sizes are now eight
+constants in one place; v1.6.2 had eleven literals across five functions, two already drifted.
+
+Cost, stated because it is real: the dashboard PDF and the consolidated pack roughly double in
+page count (~110 → ~220 entity pages), and an entity's labour and equipment figures no longer
+fit in one glance. The two families share exactly one input — patient-days, which normalises
+the equipment rate — so no supported cross-family comparison is broken.
+
+### The audit found four pooling defects that are NOT fixed, and one guard that would catch them all
+
+Deliberately left open: they move VP-facing numbers and belong in their own release with their
+own restatement note rather than folded into a layout change.
+
+- **`ot_hours_per_tech` can never generate a recommendation.** The scorecard guard checks the
+  VP frame but not the company frame, and `dash_wk_ot_co` has no such column — so the metric
+  gets a blank company value, `NaN * -1 < 0` is `False`, and one of eleven scored metrics is
+  silently incapable of being adverse. `_missing_metrics` reports nothing.
+- **The overtime per-head trailing ratios mix two week sets** — `technicians`/`employees` are
+  treated as rates (present weeks only) while `ot_hours` is a count (zero-filled). This is the
+  v1.6.0 defect family, in the overtime cell, unfixed. It **understates**, and the metric is
+  lower-is-better, so an intermittent site reads *better* than it is and escapes a
+  recommendation it earned.
+- **`recovery_rate_pct_t4w` is a mean of ratios**, and cannot currently be pooled because
+  `mature_assets` is aggregated but never trailed. It is a scored metric, and its denominators
+  are thin *by design* (cohorts ≥90 days), which is the condition under which a mean of ratios
+  diverges most.
+- **The Excel README claims all rate trailing columns are pooled.** Four are not.
+
+The single highest-value item in the audit is that **Reconciliation 4's bracket guard exists
+for census only.** It tests that a pooled ratio sits inside the range of the weekly values it
+spans, it raises, and by the v1.6.0 changelog's own account it "found defects 2, 3 and 4 after
+being written to catch 1". Two of the three defects above are live instances of the class it
+detects, in other metric families, and six lines moved into Cell 4.3 would catch both on the
+first run.
+
+### Two `CLAUDE.md` rules are not actually enforced
+
+- **Rule 3 says a pre-commit hook strips notebook outputs. `.git/hooks/` is empty — there is no
+  such hook**, and 538 outputs are committed across nine `ops_dashboard` notebooks. Every prior
+  mitigation for the 33 MB / 110-inline-figure problem assumed that hook was the backstop. (The
+  `.claude/hooks/guard.py` protecting the read-only directories *does* exist and works.)
+- **Rule 2 is violated in git history.** The committed outputs of v1.0.0–v1.2.0 contain the
+  `display(df_tx.head(3))` result with real `order_num` and `record_id` values plus technician
+  names. The v1.2.0 audit raised this as C1 and v1.3.0 fixed the *code* — the data was never
+  removed from the repository. Needs an owner's decision (history rewrite vs. documented
+  accepted exposure), not a notebook change.
+- And **`USER_ROOT = '$HOME'` never expands** — Python does not expand shell variables — so
+  `OUT_DIR` is a *relative* path and every deliverable is written to
+  `analysis/$HOME/OneDrive - DME Express/.../` inside the repo. Earlier today that folder held a
+  full deliverable set (workbook, both PDFs, dictionary, five per-VP documents, six PNGs); by the
+  end of the audit the files were gone and only the empty directory skeleton remained — I do not
+  know what removed them, and nothing in the audit did. **The defect is unchanged:** the path is
+  **not** git-ignored, the next run refills it, and one `git add -A` then commits a workbook of
+  data rows and Word documents naming technicians. Nothing reached history by this route
+  (`git log -- 'analysis/$HOME'` is empty).
+
+### Verification
+
+`analysis/lib/verify_ops_dashboard_v1_7_0.py` — 51 assertions against synthetic feeds carrying
+every case the last three releases broke on: an entity opening late, a week with tickets but no
+census, a week with **neither** (the v1.6.1 crash), uneven census coverage inside one window
+(the v1.6.2 defect), a suppressed thin-denominator site, technicians split across two sites,
+and partial weeks at both window edges. It executes Cells 4.3, 13.5 and 18 out of the notebook
+itself and re-derives Reconciliation 5 independently rather than trusting the cell to test
+itself. Runs with no database connection.
+
+**It is not a substitute for a live run.** No figure in this release is sized against live
+data, and the four open defects above have a stated direction but no magnitude.
+
+---
+
 ## 2026-08-15 — v1.6.1: the Cell 13.5 crash was in `add_trailing`, and four silent pooling defects sat behind it
 
 `analysis/ops_dashboard_2026-08-14_v1_6_1.ipynb`. Raised by the analyst, who supplied the

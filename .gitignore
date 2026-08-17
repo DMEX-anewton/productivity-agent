@@ -2,6 +2,13 @@
 data/
 audit/
 outputs/
+scratchpad/
+# Agent/analyst working files. Git-ignored deliberately and for the same reason as
+# outputs/: a scratchpad inside the repo that is NOT ignored is how a workbook of data
+# rows reaches a commit. See the 2026-08-17 audit finding on analysis/$HOME/, which is
+# that exact failure arriving by a path .gitignore did not cover.
+$HOME/
+**/$HOME/
 # ── Credentials: never committed, anywhere ──────────────────────────────────
 *.env
 .env*

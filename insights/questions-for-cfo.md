@@ -4,7 +4,72 @@ Questions analysis cannot answer from the data alone. Newest first.
 
 ---
 
-## 2026-08-15 — raised by the census-per-technician audit
+## 2026-08-17 — ANSWERED by leadership: questions 1, 2 and 3 below are settled
+
+Recorded here rather than deleted, so the question and its answer stay together. All three are
+now reflected in notebook **v1.7.1** and in the metric dictionary, the Excel README and the
+publishable PDF appendix — which previously listed them as open.
+
+**Q1 — which denominator should a per-technician caseload target use? → ANSWERED.**
+> *"ADC per technician should be calculated as total active patients on service in the period
+> divided by the total active count of technicians active in the same period."*
+
+So: **average daily census ÷ distinct technicians active in the period.** That is the middle
+row of the table below (≈ 93.1 for Jul-2026), and it is what the pack already publishes at
+company grain — `techs_equiv` equals `techs_distinct` there by construction. **Not** payroll
+headcount (~300 → 77.9) and **not** average technicians on the road per weekday (~180 → 130.6,
+the basis retired in v1.7.0).
+
+Two consequences worth noting:
+
+- **Q4 below is no longer blocking.** It was listed as a prerequisite only because a
+  payroll-based ratio would have needed the ~300 figure reconciled. The confirmed denominator
+  is the ticket-attributed count, so the payroll reconciliation is now informational.
+- **v1.7.1 asserts the definition rather than assuming it** (Reconciliation 6). At company
+  grain the apportioned headcount equalling the distinct count was an *incidental* property of
+  how `techs_equiv` is built; it is now the published definition, so the notebook raises if a
+  future change to the apportionment breaks it.
+
+**Still an analyst decision, not a leadership one — flagged, not assumed:** at VP / metro /
+warehouse grain the pack divides by the **apportioned** headcount so that site rows sum to the
+company row. Read literally at site grain, the confirmed definition would use the raw distinct
+count, which counts a technician working two sites at *both* and makes the grains
+non-additive. **Company figures are identical either way.** Both columns ship on every Census
+sheet, so either can be formed without a re-run.
+
+**Q2 — should facility `(F)` and inpatient-unit `(IPU)` census count toward caseload? → ANSWERED: NO.**
+> *"Facilities and inpatient-unit census should NOT count toward the technician caseloads."*
+
+Already excluded since v1.5.0, so **no figure moves** — but the justification changes, and that
+matters. Through v1.7.0 the exclusion was defended as *"matching the company APC snapshot
+definition"*: inherited from another report rather than chosen for this one. It is now policy
+with a date. `pt_days_unfiltered` / `adc_unfiltered` continue to carry the excluded population
+so the size of the decision stays measurable, and `Contract Test` remains excluded on the same
+basis.
+
+**Q3 — are the NULL-`customer` census rows real patients? → ANSWERED: exclude them.**
+> *"Null customer census should likewise be excluded from the technician caseload."*
+
+The number does not move, but **this one was correct by accident and is now correct on
+purpose.** Those rows were already falling out of the filtered figure only because
+`customer NOT LIKE '(F)%'` evaluates to NULL for a NULL customer and `CASE WHEN NULL` takes the
+`ELSE` branch. Nothing in the code said they should be excluded; three-valued logic was doing
+it silently, and any rewrite of the predicate into a form where that no longer held would have
+changed a published figure with no diff to explain it.
+
+v1.7.1 adds `AND APC.customer IS NOT NULL` as a declared term of the filter, driven by a new
+`CENSUS_EXCLUDE_NULL_CUSTOMER` flag. Verified against a SQL engine that the old and new
+predicates select **identical rows** and produce an identical `pt_count` — the change is to the
+*reason* the exclusion holds, not to the exclusion.
+
+**Q4 — why do ~300 payroll technicians become ~250 attributed to tickets? → STILL OPEN**, but
+downgraded from blocking to informational by the Q1 answer. Still worth closing: it is the
+reason a per-technician figure cannot be quoted against a payroll headcount, and it is an
+HR/payroll reconciliation rather than an analysis task.
+
+---
+
+## 2026-08-15 — raised by the census-per-technician audit *(Q1-Q3 answered 2026-08-17 — see above)*
 
 Context: the v1.4.0 pack reported ≈ 120 patients on service per technician; ADC ÷ headcount is
 ≈ 85–93. Both figures are arithmetically correct — they use different denominators, and the ~40%

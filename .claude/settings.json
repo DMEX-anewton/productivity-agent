@@ -2,8 +2,18 @@
   "permissions": {
     "allow": [
       "Read(./**)",
+      "Read(~/.claude/**)",
+      "Read(~/AppData/Local/Temp/claude/**)",
+      "Read(/tmp/claude/**)",
       "Edit(./**)",
       "Write(./**)",
+      "Read(./scratchpad/**)",
+      "Edit(./scratchpad/**)",
+      "Write(./scratchpad/**)",
+      "Edit(~/AppData/Local/Temp/claude/**)",
+      "Write(~/AppData/Local/Temp/claude/**)",
+      "Edit(/tmp/claude/**)",
+      "Write(/tmp/claude/**)",
       "Bash(python *)",
       "Bash(python3 *)",
       "Bash(py *)",
@@ -27,7 +37,9 @@
       "Edit(./audit/**)",
       "Read(~/.dme-secrets/**)",
       "Read(**/.dme-secrets/**)",
-      "Read(**/*.env)"
+      "Read(**/*.env)",
+      "Read(~/.claude/.credentials.json)",
+      "Read(**/.credentials.json)"
     ]
   },
   "hooks": {

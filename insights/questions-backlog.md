@@ -4,6 +4,129 @@ Open analysis work, highest value first. Move items to `insights-log.md` when an
 
 ---
 
+## v1.7.1 — the one census question leadership did NOT settle (2026-08-17)
+
+- [ ] **Decide the SITE-grain caseload denominator: apportioned headcount or raw distinct count?**
+  Leadership confirmed the metric is average daily census / distinct technicians ACTIVE IN THE
+  PERIOD. At company grain the pack already computes exactly that (Reconciliation 6 asserts it).
+  At VP/metro/warehouse grain it divides by the **apportioned** headcount so site rows sum to the
+  company row. The literal reading of the confirmed definition would use the **raw distinct
+  count** at site grain, which is arguably what a site manager means by "technicians who worked
+  here" — but it counts a technician working two sites at both, so the grains stop being
+  additive and warehouse rows no longer aggregate to their VP.
+  **Company figures are identical either way**; only VP/metro/warehouse move, and they move DOWN
+  (bigger denominator) by however much cross-site working there is. Both columns already ship on
+  every Census sheet, so either can be formed without a re-run. This is an analyst call, not a
+  leadership one — but it is a restatement of every site figure, so it needs its own version and
+  its own note rather than being folded into another release.
+
+---
+
+## v1.7.0 audit follow-ups (2026-08-17) — from `insights/code-audit-ops-dashboard-2026-08-17.md`
+
+Ordered as the audit recommends. The first item prevents the next occurrence of the next three.
+
+- [ ] **Generalise the trailing-average bracket guard out of Cell 13.5.** *(highest value in
+  the audit — six lines moved.)* Reconciliation 4 tests that a pooled ratio sits inside the
+  min–max range of the weekly values it spans, and raises. It is applied to five **census**
+  metrics and nothing else. The next two items are live instances of the class it detects, in
+  other metric families. Lift `_bracket_violations` into Cell 4.3 beside `add_trailing` and run
+  it over every `(frame, rate column)` the pack publishes. This class of defect has shipped in
+  three consecutive releases and been invisible every time.
+- [ ] **Fix the overtime per-head trailing ratios (mixed week sets).** `Cell 15.5` passes
+  `technicians` and `employees` in `rate_cols` (NaN on a quiet week, excluded from the mean)
+  while `ot_hours` is in `count_cols` (zero-filled), then divides one by the other. Numerator
+  over 4 weeks, denominator over 3 — the v1.6.0 defect family, unfixed here. It **understates**,
+  and `ot_hours_per_tech` is lower-is-better and scored, so an intermittent site reads better
+  than it is and escapes a recommendation. Move both to `count_cols`, or mask the numerator to
+  the same weeks. `ot_pct_of_worked_t4w` is fine (both parts are counts).
+- [ ] **Fix the scorecard guard, then decide about `ot_hours_per_tech`.** `Cell 17.5` checks
+  `_col not in _vpd.columns` but never tests the **company** frame. `dash_wk_ot_co` has no
+  `ot_hours_per_tech`, so the metric gets `company_value = NaN`, `NaN * -1 < 0` is `False`, and
+  one of eleven scored metrics can never be adverse — silently, with a blank row per VP in the
+  published `VP_Scorecard`. Make the guard fail loudly first. Then choose deliberately: emit
+  `ot_hours_per_tech` on the company frame from site-attributed data (covers only the ~90% of
+  hours that are attributable — say so), or drop it and score `ot_hours_per_employee`.
+- [ ] **Pool `recovery_rate_pct_t4w`.** Currently a mean of four weekly recovery rates, and it
+  cannot be pooled as-is because `mature_assets` is aggregated in `Cell 14` but absent from
+  `count_cols`. Add `mature_assets` (and `recovered_assets` is already there) and pool it. It is
+  a scored metric and its denominators are thin *by design* — cohorts ≥90 days — which is
+  exactly when a mean of ratios diverges most from the pooled figure.
+- [ ] **Reconcile the Excel README's pooling claim with reality.** It states flatly that rate
+  trailing columns are pooled, not means of weekly rates. Four are means:
+  `recovery_rate_pct_t4w`, `pct_employees_with_ot_t4w`, `leave_pct_of_total_t4w`,
+  `lost_pct_of_inventory_t4w`. Pool them or label them; do not leave the blanket claim standing.
+- [ ] **Decide whether exchange pairs are consolidated, then make the code and the dictionary
+  agree.** The metric dictionary tells a CFO that *"exchange pairs are consolidated into one
+  visit by Cell 10"*, as an assumption of the **headline** productivity numerator. `Cell 10`
+  builds `df_visits` and nothing reads it; `_dash_weekly` counts distinct `order_num` off raw
+  `df_tx`, and an exchange Pickup and Delivery carry different order numbers, so both count.
+  Either consume `df_visits` (a restatement — every ticket count falls) or delete the sentence
+  and Cell 10 together. Note the dictionary's own validation cannot catch this: it checks that
+  documented **columns exist**, not that documented **claims are true**.
+- [ ] **Split `total_tickets` by population.** One column name, three meanings: weekday-only on
+  the productivity and technician frames, all-days on the redelivery and stock-out frames. The
+  rates are internally consistent so no rate is wrong, but the dictionary defines the column
+  once as "weekday tickets only", which fits one of four frames a reader will compare. Rename to
+  `total_tickets_weekday` / `total_tickets_all_days` with an entry each. **Breaking change** for
+  saved pivots — schedule it rather than slipping it in.
+- [ ] **Promote the shared helpers into `analysis/lib/`.** `CLAUDE.md` rule 4 says to use "the
+  `run_query` pattern from `analysis/templates/`" and rule 1 says to check `analysis/lib/` before
+  writing new code; both directories contain only `.gitkeep`. `run_query`, `clean_numbers`,
+  `week_start_of`, `build_week_spine` and `add_trailing` are the obvious tenants, and it is the
+  natural home for the generalised bracket guard above. Raised as C2 in the 2026-08-14 audit and
+  still open.
+- [ ] **Cell 8.1b's `same_week` tier uses a Monday–Sunday week.** `dt.to_period('W')` against a
+  notebook whose every published week is Sunday–Saturday. It is tier 2 of a 4-tier inference
+  ladder so the impact is small — it changes which physical warehouse an inferred virtual ticket
+  lands on, not whether it is counted — but it is the last place a week boundary disagrees with
+  the shared spine, and the fix is `week_start_of(...)`.
+- [ ] **Retire the stale PTO caveat in Cell 3.1.** The comment above `OT_WEEKLY_THRESHOLD` still
+  says *"if PLC 'Hours' includes PTO/holiday pay, OT is overstated ... confirm the feed with
+  payroll"*. v1.3.0 confirmed it, excluded PTO and Holiday, and sized the effect at 18%. The
+  comment a future editor reads first describes the unresolved state.
+- [ ] **Two per-technician redelivery rates cross their denominators.** `_dash_topbottom`
+  (Cell 17) and `tech_perf_vp` (Cell 17.5) put an all-days redelivery numerator over a
+  weekday-only ticket denominator. Small and consistent in direction, so ranking is barely
+  affected — but the figure is printed on every page-1 table and in the named lists inside VP
+  recommendation documents.
+- [ ] **`_named_sites` averages weekly rates rather than pooling** (Cell 22). Defensible for a
+  ranking, but it selects which sites get named in a document that goes to a VP, in a pack whose
+  stated rule is pooling.
+- [ ] **Dead code, all three raised in the 2026-08-14 audit and still dead.** `Cell 10` in its
+  entirety (see the exchange-pair item — it costs a full `groupby.transform` over ~449k rows and
+  emits a warning nobody owns); `tbl_redel_monthly` (built with a rate, never exported);
+  `tbl_redel_product` (built, `display()`ed only, never exported — the last `display()` left);
+  `df_apc` (queried, cleaned, never read — keep the snapshot-date probe beside it, drop the
+  query). Plus `MIN_HOURS_FOR_OT_RATE` and `STOCKOUT_FROZEN_LOAD_DATE`, defined and never read.
+
+### Repository, not the notebook — these three need an owner
+
+- [ ] **There is no pre-commit hook.** `CLAUDE.md` rule 3 says *"the pre-commit hook strips
+  them; do not bypass it"*. `.git/hooks/` is empty and 538 outputs are committed across nine
+  `ops_dashboard` notebooks. v1.7.0 is committed clean, which does not fix this — the next
+  executed save re-adds them. Install the hook the rule already assumes.
+- [ ] **Patient-account identifiers are in git history.** *(needs a decision, not a code
+  change.)* The committed outputs of v1.0.0–v1.2.0 carry the `display(df_tx.head(3))` result
+  with real `order_num` / `record_id` values and technician names. v1.3.0 fixed the code; the
+  data was never removed from the repository. Options are a history rewrite over those three
+  paths (invalidates every clone) or a documented accepted exposure. It should not sit
+  undecided — and it is why the missing hook is a blocker rather than hygiene.
+- [ ] **`USER_ROOT = '$HOME'` writes every deliverable into the repo.** Python does not expand
+  shell variables, so `OUT_DIR` is a *relative* path and the notebook creates
+  `analysis/$HOME/OneDrive - DME Express/Reports/TechWorkload/<date>/` and fills it with the
+  workbook, both PDFs, the dictionary, five per-VP recommendation documents and six PNGs. That
+  folder was observed full earlier on 2026-08-17; by the end of the audit only the empty
+  directory skeleton remained (cause unknown — nothing in the audit removed it). The next run
+  refills it. **It is not git-ignored.** Use `os.path.expanduser('~')` and assert `OUT_DIR` is absolute
+  before `makedirs` — a relative deliverable path is always a bug here. Adding the path to
+  `.gitignore` is a seatbelt, not the fix.
+- [ ] **`SQL_USERNAME = 'anewton-ro'` is hardcoded in a shared notebook** (Cell 4.1). No
+  credential is in the repo, so rule 5 holds, but a second analyst either connects as someone
+  else's read-only principal or fails. Environment variable with this value as the fallback.
+
+---
+
 ## v1.6.1 follow-ups — trailing census pooling (2026-08-15)
 
 - [ ] **Re-check Cell 13.5 once more against the live run.** Four pooling defects were fixed in
