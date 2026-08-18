@@ -4,6 +4,85 @@ Newest first. Each entry: what we found, how we know, what it changes, what it d
 
 ---
 
+## 2026-08-18 — Install-time model v1.1.0: the standard is now the median, and it lands on 1.00
+
+`analysis/install_time_model_2026-08-18_v1_1_0.ipynb`; verified by
+`analysis/lib/verify_install_time_model_v1_1_0.py` (40 synthetic assertions, all passing —
+including that under right-skewed median-zero noise the median fit recovers the planted
+install times while the mean fit sits visibly above them). Live run 2026-08-18 on the same
+fallback window as v1.0.0 (2025-01-01 → 2025-11-30; the R0 data gap stands). Deliverables
+overwrite the day's folder in `OneDrive/Reports/InstallTimeModel/2026-08-18/`; note the
+v1.0.0 exports had already been removed from that folder before this run.
+
+### 1. The calibration defect v1.0.0's own scorecard caught is fixed
+
+The headline per-product standard is now a **τ=0.5 quantile fit** (non-negative LAD as an
+exact LP, HiGHS interior-point, ~7s live). Median actual/expected moved **0.73 → 1.00**;
+tickets within ±25% of standard 29% → 34%; the slow/fast anomaly tails are now balanced
+(5,322 slow / 4,424 fast vs 2,702 / 11,496). The NNLS mean fit ships beside it in every
+output as `*_mean` — it remains the correct lens for aggregate route capacity, because
+means add and medians do not.
+
+### 2. Headline medians (mean lens in parentheses)
+
+Per-visit base **4.9 min** [4.6, 5.2] (mean 10.6); full electric hospital bed **15.9**
+(17.5); 10L concentrator **8.1** (9.6); 5L concentrator **6.2** (6.9); low-air-loss
+mattress **9.1** (8.9); E-tank **1.2/cylinder** (1.4). Bed rails moved off the zero
+boundary: the mean fit priced them 0.0, the median fit says **2.1 min** [1.6, 2.6] — the
+zero-boundary flag list halved (20 → 10 products). The 4.9-min base trips the scorecard's
+own "<5 min is suspect" line — either quick drops genuinely dominate, or completion is
+sometimes stamped at handoff; that is the ride-along question already in the backlog.
+
+### 3. Virtual warehouses are out of the fit, and they were the 8-hour tail
+
+The new `virtual_or_mailout_wh` gate (Z*, Mailouts*, Distribution Center*) excluded 916
+tickets (1.44%) — and the over-8-hours exclusion bucket fell **502 → 159**, confirming the
+collections process was most of the monster-duration tail. All 916 are exported as R4v.
+
+### 4. What did not change
+
+R² 0.17: product mix still explains a minority of single-ticket variance — the standard is
+calibrated but not precise per ticket; quote distributions, not points. Warehouse median
+ratios now spread around 1.00 (Shreveport 0.71 … Lafayette 1.29, Central Houston 1.49) —
+a usable coaching lens, still **proximity, not fault**. The R0 data gap (no 2026 rows in
+SERP_ORDERS_HISTORY) remains the blocking item.
+
+## 2026-08-18 — the five "silent" warehouses were re-coded, not closed; the mechanism is a company-wide SERP renaming wave
+
+Answered without a database run, from three local sources cross-referenced: the July
+payroll OT Week files, `MonthlyTBbyLocationResults - 2026-08-14.xlsx` (finance activity by
+location by month), and the SERP↔NetSuite `Location` crosswalk inside
+`06 - Warehouse Analysis Monthly June 2026, 07-23-2026.xlsb`. Full table and the decisive
+tech-flow SQL in `questions-for-cfo.md` (top section); Q2 of 2026-08-14 is updated.
+
+**The five** (ticket volume → exactly 0 in Jul-2026): R14 San Antonio WH 2, R14 Harlingen,
+Mailouts - Texas, R15 T Storage, R01 Walker.
+
+**The finding:** every staffed one of them kept operating. San Antonio's payroll location
+is the company's largest in July (3,961 Work h over 5 weeks); Walker, LA is staffed (631 h);
+Harlingen's finance books run through July. And the ticket feed itself carries the successor
+for the biggest one: **`RNW San Antonio WH 2`** appears verbatim in the v1.7.1
+state-resolution audit — the site was re-prefixed R14→RNW, which is why an exact-string
+monthly tabulation read it as dead. Walker's crosswalk row shows finance books it inside
+"Baton Rouge / Walker / Port Allen" mapped to SERP `R01 Baton Rouge` only. Mailouts - Texas
+and R15 T Storage are unstaffed process/storage codes; successors unconfirmed (Z CS ignites
+at the same June boundary and is the leading candidate for the mailout work).
+
+**The mechanism is bigger than the five:** paired `RNW`/`R##` codes on eleven Texas sites,
+Alabama R08→R05/R06, Virginia R10↔R15, and a June-2026 renumbering of the Midwest into R11
+(six `R11 <Ohio/Illinois city>` codes first appear in the finance census that month) while
+the old R11 Carolinas region ends. Genuine closures look different in finance — Columbia SC,
+Honolulu, Hunt Valley, Pine Bluff stop after June with no successor.
+
+**Consequences:** warehouse-level trends across Jun/Jul-2026 are broken series for renamed
+sites (old + new codes must be read together — the v1.2.0 caveat about "absorbed territory"
+was righter than we knew); the census vocabulary gap (RNW College Station, RNW Lufkin,
+R16 Stafford) is the same churn, fixable with a SERP-alias map seeded from the crosswalk
+(backlog); and the Warehouse Analysis workbook's own NetSuite ADC (21,998 for Jun-2026,
+below the pack's 22,576) rules it out as the source of the 24,190 July figure — Q5 stands.
+
+---
+
 ## 2026-08-18 — Install-time model v1.0.0: per-product delivery standards, and the order-history table stops at Nov-2025
 
 `analysis/install_time_model_2026-08-18_v1_0_0.ipynb`; verified by

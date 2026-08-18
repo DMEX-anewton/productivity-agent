@@ -4,6 +4,66 @@ Questions analysis cannot answer from the data alone. Newest first.
 
 ---
 
+## 2026-08-18 (later) — Q2 below is now MOSTLY ANSWERED from local files: the five "silent" warehouses were re-coded, not closed
+
+Evidence assembled without a database run, from the July payroll OT Week files, the
+trial balance by location, and the June Warehouse Analysis workbook's SERP↔NetSuite
+`Location` crosswalk (all in `data/Financial/`):
+
+| SERP code silent after Jun-2026 | still operating? | successor code | confidence |
+|---|---|---|---|
+| R14 San Antonio WH 2 | yes — SANANTONIO is payroll's largest location (3,961 Work h Jul–Aug); NS "San Antonio, TX" books active through Jul | **RNW San Antonio WH 2** — the successor code appears verbatim in the ticket feed's state-resolution audit | **confirmed by name** |
+| R14 Harlingen | yes — NS "Harlingen, TX" books active through Jul (staff payrolled under McAllen) | **RNW Harlingen** by the same re-prefixing pattern, else absorbed into RNW/R14 McAllen | high / needs tech-flow check |
+| R01 Walker | yes — WALKER payroll staffed (631 Work h Jul–Aug) | **R01 Baton Rouge** — the June crosswalk books NS "Baton Rouge / Walker / Port Allen" to SERP `R01 Baton Rouge` only | high |
+| Mailouts - Texas | process code — never in payroll or finance | **Z CS** (ignites at the same June boundary) or an RNW mailout code | medium-low |
+| R15 T Storage | storage code — never in payroll or finance | a parent R15 Virginia site (Lorton / Winchester / Fredericksburg / Chantilly) | low by name alone |
+
+**The mechanism is a broad SERP re-coding, not five isolated events.** The crosswalk and
+the ticket feed together show: eleven Texas sites carrying paired `RNW <city>` / `R## <city>`
+codes (San Antonio, McAllen, Corpus Christi, Laredo, Irving, Del Rio, Fort Worth, Garland,
+Lufkin, College Station, Austin, Texarkana); Alabama renumbered R08→R05/R06 (Birmingham
+carries three codes); Virginia R10↔R15 (Lorton, Winchester); and in **June 2026 the
+Midwest was renumbered into R11** (R11 Chicago/Cincinnati/Cleveland/Columbus/Crystal
+Lake/Dayton all first appear in the finance census that month) while the old R11 Carolinas
+region died (finance "Columbia SC" stops after June — which also explains the census
+vocabulary-gap code `R11 Columbia - SC`). Real closures do exist and look different:
+finance shows Columbia SC, Honolulu, Hunt Valley and Pine Bluff stopping after June with
+no successor.
+
+**What remains for IT/ops (the actual open question):** the complete, dated old→new SERP
+warehouse code map — especially Harlingen, Mailouts - Texas and R15 T Storage — and
+whether SERP_APC_DAILY census flipped codes on the same date. The decisive data test, for
+whoever has the DB: take each silent site's Apr–Jun technicians and tabulate the warehouse
+codes on their July tickets (read-only, sql_explorer pattern):
+
+```sql
+WITH silent_techs AS (
+  SELECT DISTINCT TRIM(TechFirstName) AS fn, TRIM(TechLastName) AS ln,
+         TRIM(Tech_Warehouse) AS old_wh
+  FROM dbo.[SERP TRANSACTIONS] WITH (NOLOCK)
+  WHERE TRIM(Tech_Warehouse) IN ('R14 San Antonio WH 2','R14 Harlingen',
+                                 'Mailouts - Texas','R15 T Storage','R01 Walker')
+    AND TRY_CONVERT(DATE, Completed_Date) BETWEEN '2026-04-01' AND '2026-06-30'
+)
+SELECT s.old_wh, TRIM(t.Tech_Warehouse) AS jul_wh, COUNT(DISTINCT t.Order_Num) AS jul_orders
+FROM dbo.[SERP TRANSACTIONS] t WITH (NOLOCK)
+JOIN silent_techs s ON TRIM(t.TechFirstName) = s.fn AND TRIM(t.TechLastName) = s.ln
+WHERE t.[Status] <> 'Canceled'
+  AND TRY_CONVERT(DATE, t.Completed_Date) BETWEEN '2026-07-01' AND '2026-07-31'
+GROUP BY s.old_wh, TRIM(t.Tech_Warehouse)
+ORDER BY s.old_wh, jul_orders DESC;
+```
+
+**Consequences already actionable:** (a) warehouse-level trends for the renamed sites are
+broken series — old and new codes must be read together; (b) the census "vocabulary gap"
+(RNW College Station, RNW Lufkin, R16 Stafford…) is the same naming churn and is fixable
+with a SERP-alias map seeded from the crosswalk's `Location` sheet (backlog item);
+(c) on Q5: the Warehouse Analysis workbook's own NetSuite-based ADC totals **21,998 for
+Jun-2026** — *below* the pack's 22,576 — so that workbook is **not** the source of the
+24,190 July figure, and Q5 stands.
+
+---
+
 ## 2026-08-18 — from the v1.8.0 audit (census/OT reconciliation)
 
 **Q5 — What is the source and definition of the "24,190 ADC for July" figure?**
@@ -173,7 +233,7 @@ rather than a new line of business.
 - Is the same code affecting other reporting — payroll allocation, billing, or the
   warehouse P&Ls the CFO sees?
 
-### 2. Did five warehouses close at the end of June 2026, or were they renamed?
+### 2. Did five warehouses close at the end of June 2026, or were they renamed? *(UPDATE 2026-08-18: renamed/re-coded, not closed — see the answer section at the top of this file; what remains for IT is the complete dated old→new code map)*
 
 These had steady volume through June and then exactly zero in July:
 

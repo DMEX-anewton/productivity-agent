@@ -13,12 +13,15 @@ Open analysis work, highest value first. Move items to `insights-log.md` when an
 - [ ] **Confirm `Arrival_Time`/`Completion_Time` semantics with ops.** 19% of tickets
   complete faster than 0.4× the modelled standard — is that genuine quick-drop work, or are
   some timestamps entered after the fact? A ride-along on 5–10 tickets settles it.
-- [ ] **v1.1: median-calibrated standards + virtual-warehouse exclusion.** Quantile
-  regression on the same feature matrix (the mean-fit standard overprices the typical
-  ticket by ~27% under the skew), and exclude `Z *`, `Mailouts *`, and Distribution Center
-  rows from the fit the way the ops dashboard re-attributes Z-warehouse tickets.
-- [ ] **Review the 20 zero-boundary products (R6) with ops** — rails/footrest/cart pricing
-  at 0 marginal minutes is plausible, but confirm none of them ever drives a solo trip.
+- [x] *(DONE v1.1.0, 2026-08-18)* **v1.1: median-calibrated standards + virtual-warehouse
+  exclusion.** Live run: median actual/expected 0.73 → 1.00; the Z/Mailouts gate excluded
+  916 tickets and accounted for most of the >8h duration tail (502 → 159).
+- [ ] **Review the 10 remaining zero-boundary products (R6) with ops** — down from 20 in
+  v1.0.0 (the median fit prices bed rails at 2.1 min where the mean fit said 0). Confirm
+  none of the remaining zero-priced items ever drives a solo trip.
+- [ ] **The median per-visit base is 4.9 min — below the scorecard's own 5-min floor.**
+  Folds into the ride-along item below: either quick drops genuinely dominate, or
+  completion is sometimes stamped at handoff rather than at the end of the visit.
 
 ## v1.8.0 (2026-08-18) — new items from the ADC/OT audit; many v1.7.0 items below are now closed
 
@@ -48,8 +51,20 @@ per-technician redelivery denominators, `USER_ROOT`. Full detail:
   Apr → recovering; PLC people 319 Mar → 261 Apr). Missing loads, or a real slowdown after
   a February surge? Surfaced by the v1.8.1 spike scan; pair with the Feb item above.
 - [ ] **Reconcile the analyst's 24,190 July ADC** (questions-for-cfo Q5). It exceeds even
-  the pack's unfiltered 23,433; the five census-silent sites are the prime suspect, and if
-  that is it, the census feed needs fixing, not the pack.
+  the pack's unfiltered 23,433. *Update 2026-08-18:* the Warehouse Analysis workbook's own
+  NetSuite ADC is 21,998 for Jun-2026 (below the pack), so that workbook is NOT the source;
+  and the "five silent sites" turned out to be re-codes (see below), so if their census
+  flipped to the new codes too, the census wedge shrinks — re-test after the alias map.
+- [ ] **Build a SERP warehouse ALIAS MAP (v1.9.0 candidate — moves site-level numbers).**
+  The 2026-08-18 finding: the five "silent" sites were re-coded (R14 San Antonio WH 2 →
+  RNW San Antonio WH 2 verbatim in the ticket feed; Walker → R01 Baton Rouge per the
+  finance crosswalk), and the same naming churn causes the census vocabulary gap (RNW
+  College Station / RNW Lufkin / R16 Stafford). Seed the map from the `Location` sheet of
+  `06 - Warehouse Analysis Monthly June 2026, 07-23-2026.xlsb` (93 SERP→NS rows), get IT
+  to confirm the complete dated old→new list (the tech-flow SQL in questions-for-cfo runs
+  read-only and settles Harlingen / Mailouts / T Storage), then: merge renamed series so
+  site trends stop breaking at Jun/Jul-2026, and map census across name variants (closes
+  most of the 0.6% vocabulary gap). Do it as its own version — it restates site pages.
 - [ ] **Confirm the definition behind "266 active PCT FTE"** (Q8). Hours-capped FTE from
   the OT Week files averages 270.6 over the four July payroll weeks; name the definition so
   targets have a stated denominator.
