@@ -4,6 +4,40 @@ Questions analysis cannot answer from the data alone. Newest first.
 
 ---
 
+## 2026-08-18 — from the v1.8.0 audit (census/OT reconciliation)
+
+**Q5 — What is the source and definition of the "24,190 ADC for July" figure?**
+The pack's July ADC is **23,130** under the confirmed exclusions ((F), (IPU), Contract
+Test, NULL customer) and **23,433 with nothing excluded** — so 24,190 sits above even the
+unfiltered figure. Candidate explanations, each checkable once the source is named: a
+month-end snapshot rather than a daily average; a feed that still carries the **five sites
+whose SERP_APC_DAILY census went silent after Jun-2026** (in which case the pack's ADC and
+every census-normalised rate are *understated* by their census, and the feed needs fixing);
+or a census definition that includes populations leadership excluded on 2026-08-17. Until
+reconciled, comparisons between the pack and that source will disagree by ~3–5%.
+
+**Q6 — Confirm the overtime treatment of On Call Hours.** Calibrating against payroll's own
+OT Week reports shows Paylocity does **not** count on-call hours toward the 40-hour
+overtime accrual: Work-only inference matches paid OT within ~5% (within 1 hour in the week
+of 07-16), while counting on-call overstates it ~22%. v1.8.0 models what payroll pays
+(on-call excluded from the threshold, still counted as worked time). If policy is ever that
+on-call *should* accrue OT — FLSA "engaged to wait" time can — that is a payroll change,
+and the pack's `ot_hours_incl_oncall` column already measures what it would cost.
+
+**Q7 — For payroll: what explains the residual ~10% gap between inferred and paid OT in
+the weeks of 07-23 and 07-30** (inference ≈ paid in 07-09 and 07-16)? Retro adjustments,
+exempt staff, or OT paid under a code the PLC daily hours don't carry? The Cell 15.6
+calibration prints the gap every run, so the answer is verifiable.
+
+**Q8 — What is the definition behind "266 active PCT FTE" for July?** From the OT Week
+files: employees on report average 289.8/week, "Payroll FTE Hours"÷40 averages 283.5, and
+hours-capped FTE (Σ min(Work, 40)÷40) averages 270.6 over the four July payroll weeks. The
+pack's confirmed caseload denominator is ticket-attributed distinct technicians (249 in
+July). Any per-technician target needs to name which of these four populations it is set
+against — they span ~16%.
+
+---
+
 ## 2026-08-17 — ANSWERED by leadership: questions 1, 2 and 3 below are settled
 
 Recorded here rather than deleted, so the question and its answer stay together. All three are

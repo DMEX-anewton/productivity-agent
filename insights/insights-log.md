@@ -4,6 +4,132 @@ Newest first. Each entry: what we found, how we know, what it changes, what it d
 
 ---
 
+## 2026-08-18 — v1.8.1: the year on every axis, and spike surveillance for every feed
+
+`analysis/ops_dashboard_2026-08-14_v1_8_1.ipynb`; verified by
+`analysis/lib/verify_ops_dashboard_v1_8_1.py` (43 synthetic assertions, all passing,
+including a full render of all 16 pages). **No published figure moves.** Prompted by the
+analyst's three questions on v1.8.0.
+
+### 1. Why the trailing line sits 5–10% under the weekly dots — by construction
+
+Both divide the same ADC by "distinct technicians active in the period"; they just use
+different period lengths. ~230–239 distinct technicians touch tickets in any one week,
+~249 in any four-week span — the extra ~15 are people who worked *some* of the window's
+weeks but not the week in question (PTO, part-time, churn). A distinct count grows with
+the window while ADC (a stock) does not, so the weekly ratio is mechanically higher, by
+the week-to-week participation churn (~6–8% lately). The gap itself is informative: **if
+it widens, more people are cycling in and out of weekly work.** The panel states which
+period each series divides by; the trailing line is the figure to quote.
+
+### 2. The Feb/Mar-2026 dip in census-per-technician is a DENOMINATOR spike, probably artificial
+
+Feb-2026 has **373 distinct technician names** on weekday tickets vs 281 (Jan) and 282
+(Mar); the 4-week trailing window drags the inflated denominator into March. Everything
+real is flat: eligible tickets per day (Jan 26,040/31d → Feb 24,060/28d → Mar 25,035/31d),
+technician-days (4,388 → 4,211 → 4,287), patient-days on trend, payroll people with hours
+305 (vs 307/319). So ~91 extra *names* appeared for one month carrying almost no
+incremental work and **no payroll echo** — which points at name-splitting (the same people
+under new spellings, each spelling counted once) rather than 91 real bodies. Two genuine
+Feb oddities keep the surge hypothesis alive: Feb OT% (19.85%) is the highest month in
+the window, and PLC hours/day then *dropped* ~25% in Mar–Apr before recovering. **Cell
+16.5's decomposition settles it on the next live run**: transient names sharing a matched
+employee ID with a persistent name (or within one edit of one) = splitting; transient
+names with their own IDs and real volume = surge. Until then, treat Feb-2026 (and the
+trailing points through late March) per-technician figures as not quotable.
+
+### 3. Spike inventory, and the surveillance that replaces hand-finding them
+
+New Cell 16.5 tests every feed's monthly volume against the median of its neighbouring
+months (±25%, both directions — a dip is missing data as often as a spike is a dump) and
+ships the table as `Spike_Scan`, plus the technician-name decomposition as
+`Diag_TechName_Spike`. The known inventory it would have caught, each previously found by
+hand: the Feb-2026 name spike; the Jun-2026 Z CS routing change (1.3%→24.6% of tickets —
+re-attributed, not dropped); the 2025-08-01 lost-equipment bulk discard ($3.05M, excluded)
+and the three still-unconfirmed month-boundary lost spikes (2025-01-31, 2025-04-30,
+2025-05-31 — the spike report now labels boundary dates as the administrative-
+reconciliation signature); PLC re-loads (13% duplicate rows, deduped) and tail feed lag
+(08-06 week at 45%, guarded in v1.8.0); the Mar–Apr 2026 PLC hours/day dip (~−25%, open);
+five census sites silent after Jun-2026 (a step, not a spike — flagged for ~3 months by
+the scan); and stock-out creation batching (weekly incidence swings 22→356 orders — entry
+batches, so weekly incidence reads as data-entry rhythm; use the trailing average).
+Also promoted into the output: the OT monthly bridge carries `payroll_weeks`, because a
+month holds 4 or 5 Thu–Wed weeks and its raw totals swing ±25% for calendar reasons
+(July 2026's +37% vs June is mostly its fifth week).
+
+### 4. Charts
+
+Every axis now labels month starts as `MMM-YY` (Jun-26) — the old `%m/%d` labels put two
+Junes on one 19-month axis with nothing to tell them apart. Monthly-grain data would carry
+the same form; no monthly frame is currently plotted (bridges are reconciliation-only).
+
+---
+
+## 2026-08-18 — v1.8.0: the trailing caseload denominator was under-counted, and inferred OT is now calibrated to what payroll actually pays
+
+`analysis/ops_dashboard_2026-08-14_v1_8_0.ipynb`; full write-up in
+`metric-audit-v171-adc-ot-2026-08-18.md`. Triggered by the analyst's check that 24,190 July
+ADC over 266 active PCT FTE is ~91 while the pack read ~97–102. **Two published figures
+move, both down.**
+
+### 1. Census per technician, trailing: ~100 → ~94–95
+
+The pack's **monthly** July figure (92.9) already agreed with the analyst's 91 — the two
+differences in inputs (their ADC source reads 4.6% above the pack's confirmed-filter ADC;
+their FTE base is ~7% above the ticket-attributed count) nearly cancel. What read high was
+the weekly panel, for one legitimate reason and one defect:
+
+- **Legitimate and now labelled:** a distinct-count denominator grows with the period —
+  ~230 techs active in a week, ~249 in a month — while ADC (a stock) does not, so the same
+  confirmed definition yields ~101 weekly and ~93 monthly. The panel now says which period
+  each series divides by, and the run log prints the week/window/month comparison.
+- **Defect, fixed:** the trailing 4-week figure divided by the **mean of four weekly
+  distinct counts** (~234) instead of the **distinct count over the window** (~249) — a
+  technician active in three of four weeks counted ~0.75 times. That is not the confirmed
+  definition applied to the window, and it held the headline ~5–7% high. The trailing
+  denominator is now the window's own (apportioned) distinct count; Reconciliation 5 still
+  proves the printed inputs divide into the printed figure, and new Reconciliation 4b
+  asserts the window count covers every weekly count inside it.
+
+### 2. Overtime: calibrated against payroll's OT Week reports for the first time
+
+`data/Financial/OT Week *.xlsx` carries the OT **actually paid** (PCT, Thu–Wed — the same
+payroll week v1.4.0 derived empirically, independently confirmed). Against the four
+fully-loaded July weeks: v1.7.1's inference ran **+13.5%** above paid OT; Work-only
+inference lands **+5.3%** (within 1 hour in the 07-16 week); counting On Call Hours toward
+the 40-hour threshold — the v1.3.0–v1.7.1 basis — overstates paid OT **+21.7%**. So on-call
+no longer counts toward the threshold (it stays in worked hours), `ot_hours_incl_oncall`
+reconciles the old basis, and a new Cell 15.6 re-runs the calibration on every run.
+
+**Also found in the files: the 08-06 payroll week shipped 45% loaded** (5,608 dashboard
+hours vs 12,504 paid) as a complete week with 0.7% OT. A feed-completeness guard now flags
+tail weeks under 70% of the trailing hours median, draws them hollow and keeps them out of
+trailing windows. Headcount ties out (dashboard weekly employees within 0–6 of the files).
+
+### 3. Audit items closed with it
+
+A1 (the only per-technician OT metric could never produce a recommendation), A2 (per-head
+trailing ratios mixed week sets), A3 (recovery/inventory/leave/%-with-OT trailing rates were
+means of weekly ratios; recovery's synthetic case reads 13.6 pooled vs 30.0 as a mean), A4
+(the bracket guard now runs on every family — census raises, new families warn this release,
+`BRACKET_CHECKS_RAISE` promotes them), B1 (dead exchange-consolidation cell and its false
+dictionary claim removed), B3, B4, B5 (technician redelivery rates now all-days over
+all-days), C3 (`USER_ROOT` resolved at runtime, `OUT_DIR` asserted absolute).
+
+### Open
+
+The 24,190 ADC source (above even the pack's unfiltered 23,433 — possibly the five
+census-silent sites); the definition behind "266 PCT FTE" (hours-capped FTE from the OT
+files averages 270.6 over the four July weeks); the ~5% inferred-vs-paid OT residual in two
+weeks; **Feb-2026's 373 distinct technicians** (vs 247–282 every neighbouring month — a name
+or feed artifact until proven otherwise; treat Feb-2026 per-tech figures as suspect); three
+unconfirmed lost-equipment spike dates; B2 and the repo-level C1/C2.
+
+Verification: 32 synthetic assertions in `analysis/lib/verify_ops_dashboard_v1_8_0.py`, all
+passing; no live run was possible from this environment.
+
+---
+
 ## 2026-08-17 — v1.7.1: three census definitions confirmed by leadership, and one that was right by accident
 
 `analysis/ops_dashboard_2026-08-14_v1_7_1.ipynb`. Answers to questions 1–3 of

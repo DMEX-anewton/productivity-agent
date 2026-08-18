@@ -4,6 +4,51 @@ Open analysis work, highest value first. Move items to `insights-log.md` when an
 
 ---
 
+## v1.8.0 (2026-08-18) — new items from the ADC/OT audit; many v1.7.0 items below are now closed
+
+Closed by v1.8.0 and marked `[x]` below: bracket guard generalised, OT per-head week sets,
+scorecard guard + company `ot_hours_per_tech`, pooled recovery, README pooling claim,
+exchange-pair claim (removed with dead Cell 10), Cell 8.1b week boundary, stale PTO caveat,
+per-technician redelivery denominators, `USER_ROOT`. Full detail:
+`insights/metric-audit-v171-adc-ot-2026-08-18.md`.
+
+- [ ] **Run v1.8.0 live and confirm the restated figures.** Expected: trailing census per
+  technician ~94–95 (from ~99–100); company OT roughly −7% on the Work-only threshold; the
+  08-06 payroll week flagged feed-incomplete until the PLC load catches up. Watch the new
+  warn-only bracket checks on the OT/lost/redelivery/stock-out families — if the run is
+  clean, **flip `BRACKET_CHECKS_RAISE = True` (Cell 3.5)** so the guard becomes a build
+  failure as the 2026-08-17 audit intended.
+- [ ] **Investigate Feb-2026's 373 distinct technicians** (281 Jan / 282 Mar; census/tech
+  drops to 57.9 and attendance to 54.4% that month only, and the trailing window drags it
+  into March). *Progress (v1.8.1):* everything real is flat — tickets/day, tech-days,
+  patient-days, payroll people with hours (305) — so ~91 extra NAMES appeared with almost
+  no incremental work and no payroll echo, which points at NAME-SPLITTING over a real
+  surge; but Feb OT% is the window's highest (19.85%) and PLC hours/day then dipped ~25%
+  in Mar–Apr, so a February disruption is not ruled out. **Run v1.8.1: Cell 16.5's
+  decomposition (sheet Diag_TechName_Spike) counts the splitting signatures (shared
+  matched employee ID / within one edit of a persistent name) and prints a verdict.**
+  Until resolved, Feb-2026 per-technician figures are not quotable.
+- [ ] **Explain the Mar–Apr 2026 PLC hours/day dip** (~1,974/day Feb → 1,484 Mar → 1,584
+  Apr → recovering; PLC people 319 Mar → 261 Apr). Missing loads, or a real slowdown after
+  a February surge? Surfaced by the v1.8.1 spike scan; pair with the Feb item above.
+- [ ] **Reconcile the analyst's 24,190 July ADC** (questions-for-cfo Q5). It exceeds even
+  the pack's unfiltered 23,433; the five census-silent sites are the prime suspect, and if
+  that is it, the census feed needs fixing, not the pack.
+- [ ] **Confirm the definition behind "266 active PCT FTE"** (Q8). Hours-capped FTE from
+  the OT Week files averages 270.6 over the four July payroll weeks; name the definition so
+  targets have a stated denominator.
+- [ ] **Confirm the three unconfirmed lost-equipment spike dates** (2025-01-31, 2025-04-30,
+  2025-05-31 — flagged `NOT EXCLUDED` on every run). Bulk events like 2025-08-01, or real
+  loss? They remain in every trend until listed in `LOST_BULK_EVENT_DATES`.
+- [ ] **Chase the ~10% inferred-vs-paid OT residual** in the 07-23 and 07-30 payroll weeks
+  (Q7); Cell 15.6 prints it weekly whenever OT Week files are present — keep dropping the
+  weekly files into `data/Financial/`.
+- [ ] **Consider a feed-completeness guard for the census tail too.** OT got one in v1.8.0
+  because the OT Week files proved the lag; the APC feed has its own staleness warning but
+  a partially-loaded census day would still pool into ADC undetected.
+
+---
+
 ## v1.7.1 — the one census question leadership did NOT settle (2026-08-17)
 
 - [ ] **Decide the SITE-grain caseload denominator: apportioned headcount or raw distinct count?**
@@ -26,37 +71,37 @@ Open analysis work, highest value first. Move items to `insights-log.md` when an
 
 Ordered as the audit recommends. The first item prevents the next occurrence of the next three.
 
-- [ ] **Generalise the trailing-average bracket guard out of Cell 13.5.** *(highest value in
+- [x] *(DONE v1.8.0)* **Generalise the trailing-average bracket guard out of Cell 13.5.** *(highest value in
   the audit — six lines moved.)* Reconciliation 4 tests that a pooled ratio sits inside the
   min–max range of the weekly values it spans, and raises. It is applied to five **census**
   metrics and nothing else. The next two items are live instances of the class it detects, in
   other metric families. Lift `_bracket_violations` into Cell 4.3 beside `add_trailing` and run
   it over every `(frame, rate column)` the pack publishes. This class of defect has shipped in
   three consecutive releases and been invisible every time.
-- [ ] **Fix the overtime per-head trailing ratios (mixed week sets).** `Cell 15.5` passes
+- [x] *(DONE v1.8.0)* **Fix the overtime per-head trailing ratios (mixed week sets).** `Cell 15.5` passes
   `technicians` and `employees` in `rate_cols` (NaN on a quiet week, excluded from the mean)
   while `ot_hours` is in `count_cols` (zero-filled), then divides one by the other. Numerator
   over 4 weeks, denominator over 3 — the v1.6.0 defect family, unfixed here. It **understates**,
   and `ot_hours_per_tech` is lower-is-better and scored, so an intermittent site reads better
   than it is and escapes a recommendation. Move both to `count_cols`, or mask the numerator to
   the same weeks. `ot_pct_of_worked_t4w` is fine (both parts are counts).
-- [ ] **Fix the scorecard guard, then decide about `ot_hours_per_tech`.** `Cell 17.5` checks
+- [x] *(DONE v1.8.0)* **Fix the scorecard guard, then decide about `ot_hours_per_tech`.** `Cell 17.5` checks
   `_col not in _vpd.columns` but never tests the **company** frame. `dash_wk_ot_co` has no
   `ot_hours_per_tech`, so the metric gets `company_value = NaN`, `NaN * -1 < 0` is `False`, and
   one of eleven scored metrics can never be adverse — silently, with a blank row per VP in the
   published `VP_Scorecard`. Make the guard fail loudly first. Then choose deliberately: emit
   `ot_hours_per_tech` on the company frame from site-attributed data (covers only the ~90% of
   hours that are attributable — say so), or drop it and score `ot_hours_per_employee`.
-- [ ] **Pool `recovery_rate_pct_t4w`.** Currently a mean of four weekly recovery rates, and it
+- [x] *(DONE v1.8.0)* **Pool `recovery_rate_pct_t4w`.** Currently a mean of four weekly recovery rates, and it
   cannot be pooled as-is because `mature_assets` is aggregated in `Cell 14` but absent from
   `count_cols`. Add `mature_assets` (and `recovered_assets` is already there) and pool it. It is
   a scored metric and its denominators are thin *by design* — cohorts ≥90 days — which is
   exactly when a mean of ratios diverges most from the pooled figure.
-- [ ] **Reconcile the Excel README's pooling claim with reality.** It states flatly that rate
+- [x] *(DONE v1.8.0)* **Reconcile the Excel README's pooling claim with reality.** It states flatly that rate
   trailing columns are pooled, not means of weekly rates. Four are means:
   `recovery_rate_pct_t4w`, `pct_employees_with_ot_t4w`, `leave_pct_of_total_t4w`,
   `lost_pct_of_inventory_t4w`. Pool them or label them; do not leave the blanket claim standing.
-- [ ] **Decide whether exchange pairs are consolidated, then make the code and the dictionary
+- [x] *(DONE v1.8.0)* **Decide whether exchange pairs are consolidated, then make the code and the dictionary
   agree.** The metric dictionary tells a CFO that *"exchange pairs are consolidated into one
   visit by Cell 10"*, as an assumption of the **headline** productivity numerator. `Cell 10`
   builds `df_visits` and nothing reads it; `_dash_weekly` counts distinct `order_num` off raw
@@ -76,16 +121,16 @@ Ordered as the audit recommends. The first item prevents the next occurrence of 
   `week_start_of`, `build_week_spine` and `add_trailing` are the obvious tenants, and it is the
   natural home for the generalised bracket guard above. Raised as C2 in the 2026-08-14 audit and
   still open.
-- [ ] **Cell 8.1b's `same_week` tier uses a Monday–Sunday week.** `dt.to_period('W')` against a
+- [x] *(DONE v1.8.0)* **Cell 8.1b's `same_week` tier uses a Monday–Sunday week.** `dt.to_period('W')` against a
   notebook whose every published week is Sunday–Saturday. It is tier 2 of a 4-tier inference
   ladder so the impact is small — it changes which physical warehouse an inferred virtual ticket
   lands on, not whether it is counted — but it is the last place a week boundary disagrees with
   the shared spine, and the fix is `week_start_of(...)`.
-- [ ] **Retire the stale PTO caveat in Cell 3.1.** The comment above `OT_WEEKLY_THRESHOLD` still
+- [x] *(DONE v1.8.0)* **Retire the stale PTO caveat in Cell 3.1.** The comment above `OT_WEEKLY_THRESHOLD` still
   says *"if PLC 'Hours' includes PTO/holiday pay, OT is overstated ... confirm the feed with
   payroll"*. v1.3.0 confirmed it, excluded PTO and Holiday, and sized the effect at 18%. The
   comment a future editor reads first describes the unresolved state.
-- [ ] **Two per-technician redelivery rates cross their denominators.** `_dash_topbottom`
+- [x] *(DONE v1.8.0)* **Two per-technician redelivery rates cross their denominators.** `_dash_topbottom`
   (Cell 17) and `tech_perf_vp` (Cell 17.5) put an all-days redelivery numerator over a
   weekday-only ticket denominator. Small and consistent in direction, so ranking is barely
   affected — but the figure is printed on every page-1 table and in the named lists inside VP
@@ -112,7 +157,7 @@ Ordered as the audit recommends. The first item prevents the next occurrence of 
   data was never removed from the repository. Options are a history rewrite over those three
   paths (invalidates every clone) or a documented accepted exposure. It should not sit
   undecided — and it is why the missing hook is a blocker rather than hygiene.
-- [ ] **`USER_ROOT = '$HOME'` writes every deliverable into the repo.** Python does not expand
+- [x] *(DONE v1.8.0)* **`USER_ROOT = '$HOME'` writes every deliverable into the repo.** Python does not expand
   shell variables, so `OUT_DIR` is a *relative* path and the notebook creates
   `analysis/$HOME/OneDrive - DME Express/Reports/TechWorkload/<date>/` and fills it with the
   workbook, both PDFs, the dictionary, five per-VP recommendation documents and six PNGs. That
@@ -146,7 +191,7 @@ Ordered as the audit recommends. The first item prevents the next occurrence of 
 - [ ] **Test against Python 3.14 / pandas 2.3.3, not just 3.12.** That is the analyst's actual
   environment and it was not what the harness ran. The suite now runs under both; keep it that
   way, because a dtype-promotion defect is exactly the kind that differs across versions.
-- [ ] **Extend the bracket invariant to the other metric families.** It currently guards the
+- [x] *(DONE v1.8.0)* **Extend the bracket invariant to the other metric families.** It currently guards the
   census panel only, because that is where the defects were. Overtime, lost equipment,
   redeliveries and stock outs all publish pooled trailing rates built the same way and have never
   been checked. This is the highest-value remaining item in the notebook — it is ~15 lines reusing
