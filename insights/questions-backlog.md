@@ -4,6 +4,22 @@ Open analysis work, highest value first. Move items to `insights-log.md` when an
 
 ---
 
+## Install-time model v1.0.0 (2026-08-18) — new items
+
+- [ ] **BLOCKING: where do current-year delivery orders live?** `SERP_ORDERS_HISTORY`
+  ends 2025-11-30; the requested 2026-YTD window is empty (research item R0). Ask IT which
+  table carries live/2026 orders and whether the history load is scheduled or abandoned.
+  Until answered, the install-time standards are priced on Jan–Nov 2025.
+- [ ] **Confirm `Arrival_Time`/`Completion_Time` semantics with ops.** 19% of tickets
+  complete faster than 0.4× the modelled standard — is that genuine quick-drop work, or are
+  some timestamps entered after the fact? A ride-along on 5–10 tickets settles it.
+- [ ] **v1.1: median-calibrated standards + virtual-warehouse exclusion.** Quantile
+  regression on the same feature matrix (the mean-fit standard overprices the typical
+  ticket by ~27% under the skew), and exclude `Z *`, `Mailouts *`, and Distribution Center
+  rows from the fit the way the ops dashboard re-attributes Z-warehouse tickets.
+- [ ] **Review the 20 zero-boundary products (R6) with ops** — rails/footrest/cart pricing
+  at 0 marginal minutes is plausible, but confirm none of them ever drives a solo trip.
+
 ## v1.8.0 (2026-08-18) — new items from the ADC/OT audit; many v1.7.0 items below are now closed
 
 Closed by v1.8.0 and marked `[x]` below: bracket guard generalised, OT per-head week sets,

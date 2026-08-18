@@ -51,6 +51,13 @@ CFO and operations leaders can act on.
 - Database: DMEEXPRESS (Azure SQL) — SERP TRANSACTIONS, SERP_D (employees),
   PLC (payroll hours), ATI (asset tracking), redelivery tables. See
   `analysis/tech_workload_*.ipynb` for reviewed query patterns.
+- `SERP_ORDERS_HISTORY` — order lines, one row per product/asset on an order. Key columns:
+  `Order`, `ProductName`, `Asset_Tag`, `Warehouse`, `Order_Type`, `Status`, `Reason_For`,
+  `Arrival_Time`/`Completion_Time` (**nvarchar(50)**, two mixed formats: US
+  `MM/DD/YYYY HH:MM` and ISO datetime2 — parse with the dual-style `TRY_CONVERT` in
+  `analysis/install_time_model_*.ipynb`). Contains PHI columns (patient names, address,
+  phones) — never select them; hash `Ship_To_Address` in-SQL when needed for grouping.
+  As probed 2026-08-18 the table lags badly: delivery data ends 2025-11-30.
 
 ## Attribution caveats (repeat these in outputs that use them)
 

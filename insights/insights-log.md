@@ -4,6 +4,61 @@ Newest first. Each entry: what we found, how we know, what it changes, what it d
 
 ---
 
+## 2026-08-18 — Install-time model v1.0.0: per-product delivery standards, and the order-history table stops at Nov-2025
+
+`analysis/install_time_model_2026-08-18_v1_0_0.ipynb`; verified by
+`analysis/lib/verify_install_time_model_v1_0_0.py` (34 synthetic assertions, all passing —
+the harness plants known install times and every defect class, and the cells must recover
+them). Live run 2026-08-18. Deliverables (workbook + charts, order-level detail) in
+`OneDrive/Reports/InstallTimeModel/2026-08-18/`.
+
+### 1. The headline data finding: SERP_ORDERS_HISTORY has NO current-year rows
+
+The delivery population runs 2017-06 → **2025-11-30 and stops**. The requested
+current-year-to-date window is empty by construction, so the notebook fell back (loudly,
+research item R0) to the latest year-to-date the table supports: **2025-01-01 → 2025-11-30**
+(277,249 lines → 63,684 consolidated deliveries). Where 2026 delivery orders live is a
+blocking question for IT before this model can price current work. Also learned:
+`Arrival_Time`/`Completion_Time` are nvarchar in TWO mixed formats (US `MM/DD/YYYY HH:MM`
+and ISO datetime2); an explicit dual-style `TRY_CONVERT` parses **100%** of the population
+(0 residual unparseable), and `Arrival_Time` is populated on every delivery line.
+
+### 2. The per-product install times themselves are credible
+
+NNLS (install times constrained ≥ 0) with a bootstrap: per-visit base **10.9 min**
+[10.4, 11.3]; full electric hospital bed **17.5** [15.9, 18.7]; 10L concentrator **10.0**;
+5L concentrator **7.3**; low-air-loss mattress **8.7**; alternating pressure pump **9.3**;
+E-tank **1.4/cylinder**. Twenty accessories priced at the zero boundary (bed rails,
+footrests, E-tank cart) — plausible free-riders on their parent item's setup, queued as R6
+rather than trusted blindly. QC passed 93.2% of deliveries (0.25% negative durations,
+5.8% under 3 min, 0.8% over 8h; zero bulk-timestamp clusters — this feed does not batch
+close-outs the way the lost-equipment feed does).
+
+### 3. What the standard is and is NOT good for yet
+
+R² = 0.159 and MAE 14.8 min against a median visit of 18 min: product mix explains a real
+but minority share of visit-to-visit variance. Least squares calibrates to the **mean** of
+a heavily right-skewed duration distribution (P50 17 / P75 34 / P99 311 min), so the
+*typical* ticket lands under its expected time (median actual/expected **0.73**; only 29%
+of tickets within ±25%). Use the standards for **aggregate workload pricing** (a day's
+route, a warehouse's month); do not quote a single ticket against them. v1.1 direction:
+median-calibrated standards (quantile regression on the same feature matrix) and excluding
+virtual/mailout warehouses from the fit.
+
+### 4. Anomalies the run surfaced (exported research queue, 891 rows, categories R0–R9)
+
+* `Z Equipment Collections` (26 tickets): median 429 actual minutes, ratio ~23× — a
+  virtual-warehouse process wearing delivery timestamps, not field work. Exclude in v1.1
+  (same family as the ops dashboard's Z-warehouse lesson).
+* `Mailouts - Texas` ratio 2.09 — mailouts have no on-site install; the model should not
+  see them.
+* 11,496 tickets (19%) faster than 0.4× expected (R9-fast) — partly the skew above, partly
+  a real question about whether some completions are logged as quick drops; 2,702 slower
+  than 2.5× (R9-slow, top 200 exported for ticket review).
+* Warehouse median ratios span 0.47 (Columbus GA) to 1.14 (South Houston Storage); the
+  Houston metro sits consistently at/above 1.0. **Proximity, not fault** — address
+  difficulty and parking are in the residual, not the features.
+
 ## 2026-08-18 — v1.8.1: the year on every axis, and spike surveillance for every feed
 
 `analysis/ops_dashboard_2026-08-14_v1_8_1.ipynb`; verified by
