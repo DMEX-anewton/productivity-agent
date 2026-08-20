@@ -4,6 +4,126 @@ Newest first. Each entry: what we found, how we know, what it changes, what it d
 
 ---
 
+## 2026-08-19 — Ops dashboard v1.9.0: year-to-date window, census on the hired PCT payroll, and the three Texas metros become reported entities
+
+`analysis/ops_dashboard_2026-08-14_v1_9_0.ipynb`; verified by
+`analysis/lib/verify_ops_dashboard_v1_9_0.py` (**105 synthetic assertions, all passing**) — the
+v1.8.1 harness re-run against the new cell indices plus new coverage for every v1.9.0 change.
+The v1.8.1 harness still passes unchanged (43/43). **Not yet run live.** Three requested changes;
+two of them move published numbers, and both movements are denominator restatements rather than
+changes in operations.
+
+### 1. The window is year to date — and the pack now refuses to run when that is too short
+
+`FILTER_START` was a hard-coded `2025-01-01`, a ~20-month window that grew weekly and lined up
+with no other report in the company. `REPORT_WINDOW = 'YTD'` (Cell 3.1) runs 1 January of the
+current year to `AS_OF_DATE`; `'TRAILING_MONTHS'` and `'FIXED'` are retained in the same switch,
+and the second reproduces the v1.8.1 window exactly.
+
+**What it costs, stated on the cover rather than discovered later:** no prior-year baseline
+anywhere in the pack; a stale feed loses a larger share of a shorter window (lost equipment ends
+2026-02-28, so it now covers roughly the first fifth of the window and is empty after it — a flat
+trailing line there is missing data, not an absence of loss); and in early January the window is
+shorter than `ROLL_WEEKS`, at which point **every trailing column would be blank with nothing on
+the page to say why**. Cell 3.5 now raises instead. `LOST_BULK_EVENT_DATES` still lists
+2025-08-01 and now excludes nothing — retained deliberately so the exclusion does not have to be
+rediscovered if the window widens again.
+
+### 2. Census per technician now divides by the hired PCT payroll — and reads ~17% lower
+
+Requested for consistency with the corporate metrics. **The numerator did not move; the
+denominator did.** Both ratios ship at every grain, with the wedge between them:
+
+| column | denominator | status |
+|---|---|---|
+| `census_per_pct_on_payroll` | every hired PCT on the payroll in the period (~300) | **v1.9.0 headline** |
+| `census_per_tech_headcount` | apportioned technicians active on tickets (~250) | retained, unchanged |
+| `pct_active_share_pct` | the ratio between them (~83%) | new |
+
+**It contradicts the definition leadership confirmed on 2026-08-17**, which named payroll
+headcount explicitly as what the denominator was *not*. That is the analyst's call, not the
+notebook's, so the change ships the way the v1.4.0 → v1.5.0 restatement did — both figures
+published, the restatement printed on every run and on every census panel, and **Q1 re-opened**
+in `questions-for-cfo.md` rather than closed in a cell comment.
+
+**The establishment is a proxy, and it says so.** PLC has no hire date, no termination date and
+no employment status; `SERP_DME_EMPLOYEES` is a snapshot with no history. So a PCT is on the
+payroll in a week if that week falls between their first and last PLC row in the window —
+**span-filled** (a week of unpaid absence does not remove somebody from the establishment),
+**all pay types** (this measures employment, not attendance). New Cell 13.4 builds it, and also
+takes ownership of the PLC → technician name match that Cell 15.5 used to build for itself: two
+copies of a fuzzy matcher is two answers to *"which payroll people are technicians?"*, which is
+the question this release is about.
+
+**The one thing this denominator cannot do, and it matters most at site level.** PLC has no
+usable warehouse key, so a payroll head reaches a site only through the ticket name match. A
+hired PCT with no attributed tickets has no site, no metro and no VP: the company row counts the
+whole establishment and stays the reconciliation truth, entity rows count only the attributable
+part, and **every VP, metro and warehouse census ratio therefore reads high by construction**.
+The size of it travels on every row (`pct_on_payroll_unattributed_pct`), is broken down in
+`PCT_Roster_Attribution`, and is stated on every panel and in every metro document. This is the
+fourth instance of the same underlying problem — a feed with no warehouse key, resolved through a
+name match that does not resolve everything — and like the other three it is published rather
+than closed by invention. Fixing it needs a warehouse key on the payroll extract.
+
+**Four new guards, because a new denominator brings new ways to be wrong.**
+`ratio_payroll_suppressed` is a *separate* flag from `ratio_suppressed` — a site with one active
+technician and six hired PCTs is thin on the first and sound on the second, so one flag would
+either withhold a good figure or publish a bad one (the harness proves both directions of
+disagreement are reachable). A tail week whose headcount falls below 90% of its trailing median is
+flagged **roster-lagging**, its ratio withheld and excluded from every trailing window: an
+unloaded PLC week shrinks the denominator and the ratio reads high, which is the overtime
+feed-lag failure in a new place. **Reconciliation 7** raises unless the published payroll inputs
+divide into the published payroll figure; **8** unless the company denominator equals the distinct
+establishment; **4c** if the window headcount is smaller than a weekly headcount inside it.
+Reconciliations 1-6 are untouched and still cover the retained ratio.
+
+**Known limitation, taken deliberately:** the roster-lag guard cannot tell a real reduction in
+force from an unloaded feed — both remove heads from the tail of a span-filled roster. It takes
+the safer error: a false flag withholds a sound figure and prompts a question, where a missed lag
+publishes an inflated one that gets quoted. The weekly headcount is in `PCT_Roster_Weekly` either
+way, so nothing is hidden from the analyst — only from the published ratio.
+
+### 3. DFW, Houston and San Antonio are reported entities — and the metro definitions were broken
+
+Metros had dashboard pages and nothing written. Each of the three Texas metros now has a scorecard
+against the company, ranked recommendations, named technicians where the metric supports naming
+one, its own editable Word document and its own bookmarked PDF section — from **the same code VPs
+use**, driven by `SUMMARY_LEVELS`. Adding `'state'` to that list would produce state summaries
+with no further code, which is the test that the generalisation is real rather than a copy with
+the labels changed.
+
+**Metro figures move UP against a v1.8.x pack, and that is a correction, not a change in
+performance.** The metro vocabulary was matched on an incomplete city list: **`Ft. Worth`,
+`Spring`, `Stafford`, `H3S` and `League City` matched nothing at all**, so those sites sat in the
+company and VP figures and on no metro page. Two entries (`txs garland`, `south houston`) were
+dead — strictly narrower than `garland` and `houston` beside them in the same list.
+
+**And the matcher itself was unsafe for a longer list.** `spring`, needed for `R16 Spring`, is a
+substring of `R03 Hot Springs` — **an Arkansas warehouse**, which under the old substring test
+would have been reported inside the Houston metro and inside the Houston metro summary document.
+`assign_metro` now matches **whole words over a normalised name** (region prefix stripped,
+punctuation flattened, `N.` → `north`), which is the identical test for every pattern that already
+worked; the harness asserts all 22 cases including the Arkansas one. Cell 9.4 prints a coverage
+diagnostic naming every Texas warehouse that still reaches no metro with its ticket volume —
+**that list, not a guess, is how the next city gets added** — and every metro document lists the
+warehouses it is built from, so a reader can check the definition before acting on the numbers.
+
+**One consequence worth stating rather than hiding:** a technician can now be named in both a
+metro document and a VP document, measured against a different median in each, and may clear the
+bar in one and not the other. Those are answers to two different questions — *"who is behind for
+this city?"* and *"who is behind for this VP?"* — and both documents say which comparison they
+used.
+
+### What did not change
+
+Productivity, overtime, redeliveries and stock outs are untouched by the census change (none of
+them divides by census). The retained census ratio is bit-for-bit what v1.8.1 produced — asserted
+in the harness, not assumed. Overtime still excludes PTO, holiday and on-call from the 40-hour
+threshold. Every attribution caveat still travels on the data as well as in the document.
+
+---
+
 ## 2026-08-18 — Install-time model v1.1.0: the standard is now the median, and it lands on 1.00
 
 `analysis/install_time_model_2026-08-18_v1_1_0.ipynb`; verified by

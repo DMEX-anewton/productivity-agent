@@ -4,6 +4,41 @@ Open analysis work, highest value first. Move items to `insights-log.md` when an
 
 ---
 
+## v1.9.0 (2026-08-19) — new items
+
+- [ ] **RUN v1.9.0 LIVE. Nothing in it has touched real data yet.** Watch, in order: the metro
+  coverage diagnostic (Cell 9.4) — every Texas warehouse it names as unassigned is volume missing
+  from a metro summary, and each is one `METRO_GROUPS` entry away from being fixed; the payroll
+  establishment count and its unattributed share (Cell 13.4) — expect ~300 heads and ~20%
+  unattributable, and if the unattributed share is much higher then the name match, not the
+  denominator, is the problem; and whether any tail week is flagged roster-lagging on the first
+  run, which would mean the pack cannot publish a current payroll census figure until the PLC load
+  catches up.
+- [ ] **Confirm the metro membership lists with ops before circulating a metro document.** The
+  vocabulary is now speculative in places: `Stafford`, `H3S`, `Spring` and the DFW/Houston suburb
+  names were added from geography, not from a warehouse register. Print the coverage diagnostic's
+  assigned lists and have ops confirm each one. A metro summary that quietly includes or excludes
+  a site is worse than one that says it cannot see it.
+- [ ] **Decide the caseload denominator (blocks any staffing target).** Two live definitions of
+  one metric is a temporary state — see the re-opened Q1 in `questions-for-cfo.md`. Once chosen,
+  retire the loser to a reconciliation column and then drop it, the way the v1.4.0 basis was
+  handled. Until then every target conversation has to name its basis.
+- [ ] **Ask payroll for a warehouse key on the PLC extract.** It is the single change that would
+  fix the most things at once: site-level census on the payroll basis (currently high by
+  construction), the ~10% of overtime hours that cannot reach a site, and the 25% of PCT payroll
+  records that tie to no technician. Every one of those is the same missing column.
+- [ ] **Ask HR for an employee-status feed with effective dates (Q9).** The establishment is a
+  span-filled proxy for want of hire and termination dates, and the roster-lag guard cannot tell a
+  real reduction in force from an unloaded payroll week. A status feed removes both problems.
+- [ ] **Revisit the trailing window under YTD before December.** A trailing 4-week average on a
+  window that restarts every 1 January means January packs are structurally thin, and Cell 3.5 now
+  refuses to build one at all before week 6 of the year. Decide whether the January pack switches
+  to `REPORT_WINDOW='TRAILING_MONTHS'` or simply is not produced.
+- [ ] **`pct_active_share_pct` is worth reading on its own.** It is the share of the hired
+  establishment appearing on a ticket, and nobody has yet looked at how it varies by VP, metro and
+  month. A site running at 60% where the company runs at 83% is either mis-mapped or carrying
+  people who are not doing field work, and both are worth knowing.
+
 ## Install-time model v1.0.0 (2026-08-18) — new items
 
 - [ ] **BLOCKING: where do current-year delivery orders live?** `SERP_ORDERS_HISTORY`

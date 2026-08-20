@@ -4,6 +4,67 @@ Questions analysis cannot answer from the data alone. Newest first.
 
 ---
 
+## 2026-08-19 — Q1 IS RE-OPENED: the caseload denominator has been changed to the hired PCT payroll
+
+**This reverses part of the 2026-08-17 answer recorded further down this file, and it needs a
+decision rather than another notebook release.**
+
+Notebook **v1.9.0** was asked to publish census per technician against **every hired Patient
+Care Technician on the payroll**, for consistency with the corporate metrics. On 2026-08-17
+leadership answered Q1 the other way, explicitly: *"divided by the total active count of
+technicians active in the same period"* — and named payroll headcount (~300) as one of the two
+bases it was **not**.
+
+Both figures now ship at every grain, so the pack is usable under either answer:
+
+| basis | Jul-2026 | status in v1.9.0 |
+|---|---|---|
+| ADC ÷ hired PCTs on the payroll (~300) | **≈ 77.9** | **published headline** |
+| ADC ÷ distinct technicians active on tickets (~250) | ≈ 93.1 | retained, unchanged — the 2026-08-17 answer |
+| *ratio between them* (`pct_active_share_pct`) | ≈ 83% | published, so either can be derived from the other |
+
+**What we need from leadership: which one is the metric?** Not both. Carrying two live
+definitions of one number is a temporary state that ends with somebody quoting whichever is
+more flattering. Whichever is chosen, the other should become a reconciliation column and then
+be retired, exactly as the v1.4.0 basis was.
+
+**Three things to know before deciding.**
+
+1. **Any target quoted against the 2026-08-17 basis is now ~17% high** relative to the v1.9.0
+   headline, and vice versa. The gap is not an error in either figure — it is the share of the
+   hired establishment that appears on a ticket in the period.
+
+2. **The payroll basis makes site-level figures structurally high, and we cannot fix that from
+   the data we have.** `PLC_EMPLOYEE_HOURS` carries no usable warehouse key (2 of 139
+   `Location_Name` values match `SERP_WAREHOUSES`), so a payroll head reaches a warehouse only
+   through the ticket name match. A hired PCT with no attributed tickets has **no site, no metro
+   and no VP**: the company row counts the whole establishment, entity rows count only the
+   attributable part (~80%), and every VP, metro and warehouse census ratio therefore reads
+   high. The active-technician basis has no such gap, because everyone in it is on a ticket by
+   definition. **This is the strongest technical argument against the payroll basis**, and the
+   fix is a warehouse key on the payroll extract, not an analysis change.
+
+3. **Q8 (2026-08-18) is now load-bearing rather than informational.** "266 active PCT FTE" for
+   July is one of at least four payroll-side populations that span ~16%: employees on the OT
+   report average 289.8/week, Payroll FTE Hours ÷ 40 averages 283.5, hours-capped FTE averages
+   270.6, and v1.9.0's span-filled PLC establishment is its own count. **If the denominator is
+   payroll, the pack has to be told which payroll number** — otherwise it will disagree with the
+   corporate figure it was changed to match, which defeats the purpose of the change.
+
+**Q9 (new) — can we get an employee-status feed with effective dates?** v1.9.0's establishment
+is a **proxy**, and it has to be: PLC has no hire date, no termination date and no employment
+status, and `SERP_DME_EMPLOYEES` is a snapshot with no history. A PCT therefore counts as on the
+payroll in a week if that week falls between their first and last PLC row in the window. The
+errors are small and both follow the payroll record rather than an assumption — a technician
+hired in January whose first hours land in February is counted from February; one who resigned
+in March with a final PTO payout in June is counted through June — but they are errors, and a
+status feed with effective dates would remove them entirely. It would also let the pack tell a
+genuine reduction in force apart from a payroll load that has not landed, which it currently
+cannot: both remove heads from the tail of the roster, so v1.9.0 flags the week and withholds
+the ratio rather than publish a denominator it does not trust.
+
+---
+
 ## 2026-08-18 (later) — Q2 below is now MOSTLY ANSWERED from local files: the five "silent" warehouses were re-coded, not closed
 
 Evidence assembled without a database run, from the July payroll OT Week files, the
@@ -104,7 +165,7 @@ Recorded here rather than deleted, so the question and its answer stay together.
 now reflected in notebook **v1.7.1** and in the metric dictionary, the Excel README and the
 publishable PDF appendix — which previously listed them as open.
 
-**Q1 — which denominator should a per-technician caseload target use? → ANSWERED.**
+**Q1 — which denominator should a per-technician caseload target use? → ANSWERED, then RE-OPENED 2026-08-19 (see the top of this file — v1.9.0 publishes the payroll basis as the headline by request).**
 > *"ADC per technician should be calculated as total active patients on service in the period
 > divided by the total active count of technicians active in the same period."*
 
